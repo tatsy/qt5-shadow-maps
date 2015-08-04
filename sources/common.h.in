@@ -1,0 +1,7 @@
+#ifndef _COMMON_H_
+#define _COMMON_H_
+
+const char* SOURCE_DIRECTORY = "@CMAKE_SOURCE_DIR@/sources/";
+const char* DATA_DIRECTORY = "@CMAKE_SOURCE_DIR@/data/";
+
+#endif // _COMMON_H_

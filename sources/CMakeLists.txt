@@ -1,18 +1,22 @@
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-set(SOURCES appmain.cc shadow_mapping_widget.cc)
-set(HEADERS shadow_mapping_widget.h)
+configure_file(common.h.in ${CMAKE_CURRENT_LIST_DIR}/common.h @ONLY)
+
+set(SOURCES appmain.cc shadow_mapping_widget.cc vbo.cc)
+set(HEADERS shadow_mapping_widget.h vbo.h common.h)
 set(SHADERS render.fs render.vs shadow_mapping.fs shadow_mapping.vs)
 
 add_executable(qtshadowmapping ${SOURCES} ${HEADERS} ${SHADERS})
 qt5_use_modules(qtshadowmapping Widgets OpenGL)
-target_link_libraries(qtshadowmapping ${QT_LIBRARIES})
+target_link_libraries(qtshadowmapping ${QT_LIBRARIES} ${OPENGL_LIBRARIES})
 
 set (QT_LIBRARY_LIST Qt5Widgets Qt5Core Qt5Gui Qt5OpenGL)
 set (ICXXX_LIBRARY_LIST icuin53 icuuc53 icudt53)
 
 if (MSVC)
+  set_property(TARGET qtshadowmapping APPEND PROPERTY LINK_FLAGS /DEBUG)
+
   foreach (LIB ${QT_LIBRARY_LIST})
     add_custom_command(TARGET qtshadowmapping POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
