@@ -35,6 +35,7 @@ public:
     VBO& operator=(VBO&& vbo);
 
     static VBO fromObjFile(const char* filename, const QVector3D color = QVector3D(1.0f, 1.0f, 1.0f));
+    static VBO colorBox();
     static VBO checkerFloor(QVector3D normal, double dist, double size, int rows, int cols, const QVector3D color1 = QVector3D(0.8f, 0.8f, 0.8f), const QVector3D color2 = QVector3D(0.5f, 0.5f, 0.5f));
 
     inline const std::vector<QVector3D>& vertices() const { return _vertices; }

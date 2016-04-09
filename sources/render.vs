@@ -11,6 +11,9 @@ uniform mat4 depthBiasMVP;
 
 uniform vec3 lightPosition;
 
+out vec3 vertexWorldspace;
+out vec3 normalWorldspace;
+
 out vec3 vertexCameraspace;
 out vec3 normalCameraspace;
 out vec3 lightCameraspace;
@@ -20,6 +23,9 @@ out vec4 shadowCoord;
 
 void main(void) {
   gl_Position = projectionMatrix * modelviewMatrix * vec4(vertices, 1.0);
+
+  vertexWorldspace = vertices;
+  normalWorldspace = normals;
 
   vertexCameraspace = (modelviewMatrix * vec4(vertices, 1.0)).xyz;
   normalCameraspace = (normalMatrix * vec4(normals, 1.0)).xyz;

@@ -8,6 +8,7 @@ endif()
 
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5OpenGL REQUIRED)
+find_package(Qt5Gui REQUIRED)
 find_package(OpenGL REQUIRED)
 
 set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/build)

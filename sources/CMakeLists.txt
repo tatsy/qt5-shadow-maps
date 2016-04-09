@@ -1,43 +1,32 @@
+set(BUILD_TARGET "shadowmaps")
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 configure_file(common.h.in ${CMAKE_CURRENT_LIST_DIR}/common.h @ONLY)
 
-set(SOURCES appmain.cc shadow_mapping_widget.cc vbo.cc)
-set(HEADERS shadow_mapping_widget.h vbo.h common.h)
+set(SOURCES appmain.cc maingui.cc shadowmaps_widget.cc vbo.cc arcball_controller.cc)
+set(HEADERS maingui.h shadowmaps_widget.h vbo.h arcball_controller.h common.h)
 set(SHADERS render.fs render.vs shadow_mapping.fs shadow_mapping.vs)
 
-add_executable(qt5shadowmapping ${SOURCES} ${HEADERS} ${SHADERS})
-qt5_use_modules(qt5shadowmapping Widgets OpenGL)
-target_link_libraries(qt5shadowmapping ${QT_LIBRARIES} ${OPENGL_LIBRARIES})
+add_definitions(-D_USE_MATH_DEFINES)
+add_executable(${BUILD_TARGET} ${SOURCES} ${HEADERS} ${SHADERS})
+qt5_use_modules(${BUILD_TARGET} Widgets OpenGL)
+target_link_libraries(${BUILD_TARGET} ${QT_LIBRARIES} ${OPENGL_LIBRARIES})
 
-set (QT_LIBRARY_LIST Qt5Widgets Qt5Core Qt5Gui Qt5OpenGL)
-set (ICXXX_LIBRARY_LIST icuin53 icuuc53 icudt53)
+source_group("Source Files" FILES ${SOURCES} ${HEADERS})
+source_group("Shaders" FILES ${SHADERS})
+
+set (QT_LIBRARY_LIST Qt5Widgets Qt5Core Qt5Gui Qt5OpenGL
+     Qt5Widgetsd Qt5Cored Qt5Guid Qt5OpenGLd
+     icuin54 icuuc54 icudt54)
 
 if (MSVC)
-  set_property(TARGET qt5shadowmapping APPEND PROPERTY LINK_FLAGS /DEBUG)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi")
+  set_property(TARGET ${BUILD_TARGET} APPEND PROPERTY LINK_FLAGS "/DEBUG /PROFILE")
 
   foreach (LIB ${QT_LIBRARY_LIST})
-    add_custom_command(TARGET qt5shadowmapping POST_BUILD
+    add_custom_command(TARGET ${BUILD_TARGET} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-    ARGS ${CMAKE_PREFIX_PATH}/bin/${LIB}.dll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE})
-  endforeach()
-
-  foreach (LIB ${QT_LIBRARY_LIST})
-    add_custom_command(TARGET qt5shadowmapping POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ARGS ${CMAKE_PREFIX_PATH}/bin/${LIB}d.dll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
-  endforeach()
-
-  foreach (LIB ${ICXXX_LIBRARY_LIST})
-    add_custom_command(TARGET qt5shadowmapping POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ARGS ${CMAKE_PREFIX_PATH}/bin/${LIB}.dll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE})
-  endforeach()
-
-  foreach (LIB ${ICXXX_LIBRARY_LIST})
-    add_custom_command(TARGET qt5shadowmapping POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ARGS ${CMAKE_PREFIX_PATH}/bin/${LIB}.dll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+  ARGS "${CMAKE_PREFIX_PATH}/bin/${LIB}.dll" ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
   endforeach()
 endif()
