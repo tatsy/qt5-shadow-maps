@@ -71,7 +71,7 @@ void main(void) {
   if (mode == MODE_SM) {
       color = vec4(vertexColor, 1.0) * (diffuse + specular + ambient) * shadow;
   } else if (mode == MODE_RSM) {
-      color = vec4(vertexColor, 1.0) * diffuse * shadow;
+      color = vec4(vertexColor, 1.0) * (diffuse + specular + ambient) * shadow;
 
       if (receiveShadow == 0) {
           vec3 rsm = reflectiveSM(vertexWorldspace, normalWorldspace);
