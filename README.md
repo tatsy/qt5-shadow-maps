@@ -14,7 +14,9 @@ $ cmake --build .
 
 ## Result
 
-![Result](./results/result.png)
+| Shadow Maps                 | Reflective Shadow Maps    |
+|-----------------------------|---------------------------|
+| ![Result](./results/sm.png) | ![RSM](./results/rsm.png) |
 
 ## License
 

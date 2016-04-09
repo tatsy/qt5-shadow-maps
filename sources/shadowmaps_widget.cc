@@ -29,6 +29,17 @@ enum class DrawMode : int {
     Albedo = 0x03
 };
 
+void showInfo() {
+    std::cout << " ----- OpenGL Support -----" << std::endl;
+    std::cout << "        Vendor: " << glGetString(GL_VENDOR) << std::endl;
+    std::cout << "      Renderer: " << glGetString(GL_RENDERER) << std::endl;
+    std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
+    std::cout << "  GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl << std::endl;
+    std::cout << " -------- Buttons ---------" << std::endl;
+    std::cout << "  Space: Change SM mode (SM / RSM)" << std::endl;
+    std::cout << " Return: Save current buffer" << std::endl << std::endl;
+}
+
 ShadowMaps shadowMode = ShadowMaps::SM;
 
 }  // anonymous namespace
@@ -44,17 +55,16 @@ ShadowMapsWidget::ShadowMapsWidget(QWidget* parent)
     , floorVBO()
     , depthFBO(NULL)
     , depthTexture(NULL)
-    , arcball(NULL)
-{
+    , arcball(NULL) {
     setWindowTitle("Qt5 Shadow Maps (SM)");
+
     arcball = new ArcballController(this);
     camera.eye = QVector3D(10.0f, 10.0f, 10.0f);
     camera.look = QVector3D(0.0f, 0.0f, 0.0f);
     camera.up = QVector3D(0.0f, 1.0f, 0.0f);
 }
 
-ShadowMapsWidget::~ShadowMapsWidget()
-{
+ShadowMapsWidget::~ShadowMapsWidget() {
     makeCurrent();
 
     delete renderShader;
@@ -67,6 +77,8 @@ ShadowMapsWidget::~ShadowMapsWidget()
 }
 
 void ShadowMapsWidget::initializeGL() {
+    showInfo();
+
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_NORMALIZE);
@@ -150,6 +162,10 @@ void ShadowMapsWidget::keyPressEvent(QKeyEvent* ev) {
             setWindowTitle("Qt5 Shadow Maps (SM)");
         }
         update();
+    } else if (ev->key() == Qt::Key_Return) {
+        QImage image = grabFramebuffer();
+        image.save("result.png");
+        printf("Saved!!\n");
     }
 }
 
@@ -213,6 +229,9 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
 
     renderShader->release();
     depthTexture->release();
+    normalTexture->release();
+    positionTexture->release();
+    albedoTexture->release();
 }
 
 void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
