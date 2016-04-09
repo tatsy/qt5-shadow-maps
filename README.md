@@ -1,4 +1,4 @@
-qt5-shadow-mapping
+qt5-shadow-maps
 ===
 
 > Shadow mapping implementation with Qt5 and OpenGL (Qt 5.4 or higher)
