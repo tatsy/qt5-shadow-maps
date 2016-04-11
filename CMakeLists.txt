@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.0)
 project(Qt5ShadowMapping)
 
 if (MSVC)
-  set(Your_Qt5_DIR "C:/Qt/5.4/msvc2013_64_opengl" CACHE STRING "Your_Qt5_DIR")
+  set(Your_Qt5_DIR "Qt5-NOT_FOUND" CACHE PATH "")
   set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${Your_Qt5_DIR})
 endif()
 

@@ -17,11 +17,6 @@ QMatrix4x4 biasMat(
     0.0f, 0.0f, 0.0f, 1.0f
 );
 
-enum class ShadowMaps : int {
-    SM = 0x00,
-    RSM = 0x01
-};
-
 enum class DrawMode : int {
     Depth = 0x00,
     Normal = 0x01,
@@ -35,12 +30,7 @@ void showInfo() {
     std::cout << "      Renderer: " << glGetString(GL_RENDERER) << std::endl;
     std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
     std::cout << "  GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl << std::endl;
-    std::cout << " -------- Buttons ---------" << std::endl;
-    std::cout << "  Space: Change SM mode (SM / RSM)" << std::endl;
-    std::cout << " Return: Save current buffer" << std::endl << std::endl;
 }
-
-ShadowMaps shadowMode = ShadowMaps::SM;
 
 }  // anonymous namespace
 
@@ -76,6 +66,10 @@ ShadowMapsWidget::~ShadowMapsWidget() {
     doneCurrent();
 }
 
+void ShadowMapsWidget::setShadowMode(ShadowMaps mode) {
+    shadowMode = mode;
+}
+
 void ShadowMapsWidget::initializeGL() {
     showInfo();
 
@@ -108,9 +102,8 @@ void ShadowMapsWidget::initializeGL() {
 }
 
 void ShadowMapsWidget::paintGL() {
-    // Compute depth
+    // Compute shadow maps   
     static QMatrix4x4 depthMVP;
-
     if (depthMVP.isIdentity()) {
         shadowMapping(&depthMVP);
     }
@@ -152,23 +145,6 @@ void ShadowMapsWidget::wheelEvent(QWheelEvent* ev) {
     update();
 }
 
-void ShadowMapsWidget::keyPressEvent(QKeyEvent* ev) {
-    if (ev->key() == Qt::Key_Space) {
-        if (shadowMode == ShadowMaps::SM) {
-            shadowMode = ShadowMaps::RSM;
-            setWindowTitle("Qt5 Shadow Maps (RSM)");
-        } else {
-            shadowMode = ShadowMaps::SM;
-            setWindowTitle("Qt5 Shadow Maps (SM)");
-        }
-        update();
-    } else if (ev->key() == Qt::Key_Return) {
-        QImage image = grabFramebuffer();
-        image.save("result.png");
-        printf("Saved!!\n");
-    }
-}
-
 void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
     // Set projection / modelview matrices
     QMatrix4x4 projectionMatrix, modelviewMatrix, normalMatrix;
@@ -188,7 +164,7 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
     positionTexture->bind(2);
     albedoTexture->bind(3);
 
-    // Compute pseudo random
+    // Compute sampling pattern
     const int nSamples = 256;
     static std::vector<QVector2D> randoms;
     if (randoms.empty()) {

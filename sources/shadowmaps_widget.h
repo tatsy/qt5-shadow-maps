@@ -19,12 +19,19 @@ struct Camera {
     QVector3D eye, look, up;
 };
 
+enum class ShadowMaps : int {
+    SM = 0x00,
+    RSM = 0x01
+};
+
 class ShadowMapsWidget : public QOpenGLWidget {
     Q_OBJECT
 
 public:
     explicit ShadowMapsWidget(QWidget* parent = NULL);
     ~ShadowMapsWidget();
+
+    void setShadowMode(ShadowMaps mode);
 
 protected:
     void initializeGL() override;
@@ -35,8 +42,6 @@ protected:
     void mouseMoveEvent(QMouseEvent* ev) override;
     void mouseReleaseEvent(QMouseEvent* ev) override;
     void wheelEvent(QWheelEvent* ev) override;
-
-    void keyPressEvent(QKeyEvent* ev) override;
 
 private:
     // Private methods
@@ -64,6 +69,8 @@ private:
 
     ArcballController* arcball;
     Camera camera;
+
+    ShadowMaps shadowMode = ShadowMaps::SM;
 };
 
 #endif // _SHADOW_MAPPING_WIDGET_H_
