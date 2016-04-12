@@ -46,9 +46,13 @@ protected:
 private:
     // Private methods
     void shadowMapping(QMatrix4x4* depthMVP);
+    void imperfectShadowMapping(const std::vector<QVector3D>& vplPositions,
+                                std::vector<QMatrix4x4>* vplMVP);
     void drawScene(const QMatrix4x4& depthMVP);
 
-    QOpenGLShaderProgram* compileShader(const QString& vShaderFile, const QString& fShaderFile);
+    QOpenGLShaderProgram* compileShader(const QString& vShaderFile,
+                                        const QString& fShaderFile,
+                                        const QString& gShaderFile = "");
     void drawVBO(QOpenGLShaderProgram* const program, const VBO& vbo);
 
     void setTexture(QOpenGLTexture* texture, const QImage& image) const;
@@ -59,6 +63,8 @@ private:
 
     QOpenGLShaderProgram* renderShader;
     QOpenGLShaderProgram* shadowmapShader;
+    QOpenGLShaderProgram* ismShader;
+
     VBO objectVBO;
     VBO floorVBO;
     QOpenGLFramebufferObject* depthFBO;

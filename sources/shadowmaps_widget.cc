@@ -89,6 +89,9 @@ void ShadowMapsWidget::initializeGL() {
                                     QString(SOURCE_DIRECTORY) + "shaders/render.fs");
     shadowmapShader = compileShader(QString(SOURCE_DIRECTORY) + "shaders/shadow_maps.vs",
                                     QString(SOURCE_DIRECTORY) + "shaders/shadow_maps.fs");
+    ismShader       = compileShader(QString(SOURCE_DIRECTORY) + "shaders/ism.vs",
+                                    QString(SOURCE_DIRECTORY) + "shaders/ism.fs",
+                                    QString(SOURCE_DIRECTORY) + "shaders/ism.gs");
 
     // Initialize FBO
     depthFBO        = new QOpenGLFramebufferObject(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, QOpenGLFramebufferObject::Attachment::Depth, GL_TEXTURE_2D);
@@ -109,6 +112,8 @@ void ShadowMapsWidget::paintGL() {
     static QMatrix4x4 depthMVP;
     if (depthMVP.isIdentity()) {
         shadowMapping(&depthMVP);
+        std::vector<QMatrix4x4> mvps;
+        imperfectShadowMapping(std::vector<QVector3D>(), &mvps);
     }
 
     // Draw scene
@@ -283,6 +288,40 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     glViewport(0, 0, width(), height());
 }
 
+void ShadowMapsWidget::imperfectShadowMapping(
+    const std::vector<QVector3D>& vplPositions,
+    std::vector<QMatrix4x4>* mvpVPL) {
+    glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+
+    depthFBO->bind();
+    ismShader->bind();
+
+    mvpVPL->resize(64);
+    for (int i = 0; i < 64; i++) {
+        QMatrix4x4 mvMat, pMat;
+        //mvMat.lookAt(vplPositions[i], QVector3D(0.0, 0.0, 0.0), QVector3D(0.0, 1.0, 0.0));
+        mvMat.lookAt(LIGHT_POSITION, QVector3D(0.0, 0.0, 0.0), QVector3D(0.0, 1.0, 0.0));
+        pMat.ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.0f, 25.0f);
+        (*mvpVPL)[i] = pMat * mvMat;
+    }
+
+    ismShader->setUniformValue("smRows", 8);
+    ismShader->setUniformValue("smCols", 8);
+    ismShader->setUniformValueArray("mvpVPL", &(*mvpVPL)[0], 64);
+
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    drawVBO(ismShader, objectVBO);
+    
+    depthFBO->toImage().save(QString(OUTPUT_DIRECTORY) + "ism.png");
+
+    depthFBO->release();
+    ismShader->release();
+
+    glViewport(0, 0, width(), height());
+}
+
 void ShadowMapsWidget::drawVBO(QOpenGLShaderProgram* const shader, const VBO& vbo) {
     shader->enableAttributeArray("vertices");
     shader->enableAttributeArray("normals");
@@ -322,10 +361,16 @@ void ShadowMapsWidget::setTexture(QOpenGLTexture* texture, const QImage& image) 
 
 }
 
-QOpenGLShaderProgram* ShadowMapsWidget::compileShader(const QString& vShaderFile, const QString& fShaderFile) {
+QOpenGLShaderProgram* ShadowMapsWidget::compileShader(
+    const QString& vShaderFile,
+    const QString& fShaderFile,
+    const QString& gShaderFile) {
     QOpenGLShaderProgram* shader = new QOpenGLShaderProgram();
     shader->addShaderFromSourceFile(QOpenGLShader::Vertex, vShaderFile);
     shader->addShaderFromSourceFile(QOpenGLShader::Fragment, fShaderFile);
+    if (gShaderFile != "") {
+        shader->addShaderFromSourceFile(QOpenGLShader::Geometry, gShaderFile);
+    }
     shader->link();
 
     if (!shader->isLinked()) {

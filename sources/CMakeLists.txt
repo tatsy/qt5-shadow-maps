@@ -7,7 +7,6 @@ configure_file(common.h.in ${CMAKE_CURRENT_LIST_DIR}/common.h @ONLY)
 set(SOURCES appmain.cc maingui.cc shadowmaps_widget.cc vbo.cc arcball_controller.cc)
 set(HEADERS maingui.h shadowmaps_widget.h vbo.h arcball_controller.h common.h)
 file(GLOB SHADERS "${CMAKE_CURRENT_LIST_DIR}/shaders/*.[vfg]s")
-message(STATUS ${SHADERS})
 
 add_definitions(-D_USE_MATH_DEFINES)
 add_executable(${BUILD_TARGET} ${SOURCES} ${HEADERS} ${SHADERS})
