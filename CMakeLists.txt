@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.0)
-project(Qt5ShadowMapping)
+project(Qt5ShadowMaps)
 
 if (MSVC)
   set(Your_Qt5_DIR "Qt5-NOT_FOUND" CACHE PATH "")
@@ -20,5 +20,7 @@ if (NOT MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -Wall")
 endif()
+
+file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/output")
 
 add_subdirectory(sources)

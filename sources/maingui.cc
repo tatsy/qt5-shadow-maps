@@ -6,6 +6,7 @@
 #include <QtWidgets/qradiobutton.h>
 #include <QtWidgets/qfiledialog.h>
 
+#include "common.h"
 #include "shadowmaps_widget.h"
 
 // --
@@ -95,7 +96,9 @@ MainGUI::~MainGUI() {
 
 void MainGUI::OnSaveButtonClicked() {
     QString savefile = 
-        QFileDialog::getSaveFileName(this, tr("Save"), tr("image.jpg"), tr("JPEG (*.jpg);PNG (*.png)"));
+        QFileDialog::getSaveFileName(this, tr("Save"), 
+                                     tr(OUTPUT_DIRECTORY) + tr("image.jpg"),
+                                     tr("JPEG (*.jpg);PNG (*.png)"));
     if (savefile == "") return;
 
     QImage image = displayWidget->grabFramebuffer();

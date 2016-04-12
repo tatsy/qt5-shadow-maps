@@ -80,12 +80,15 @@ void ShadowMapsWidget::initializeGL() {
     glEnable(GL_CULL_FACE);
 
     // Load obj files
-    objectVBO = VBO::fromObjFile((QString(DATA_DIRECTORY) + "budda.obj").toStdString().c_str(), QVector3D(0.5f, 0.5f, 0.5f));
+    const char* objfile = (std::string(DATA_DIRECTORY) + "budda.obj").c_str();
+    objectVBO = VBO::fromObjFile(objfile, QVector3D(0.5f, 0.5f, 0.5f));
     floorVBO  = VBO::colorBox(); 
 
     // Prepare shader programs
-    renderShader    = compileShader(QString(SOURCE_DIRECTORY) + "render.vs", QString(SOURCE_DIRECTORY) + "render.fs");
-    shadowmapShader = compileShader(QString(SOURCE_DIRECTORY) + "shadow_mapping.vs", QString(SOURCE_DIRECTORY) + "shadow_mapping.fs");
+    renderShader    = compileShader(QString(SOURCE_DIRECTORY) + "shaders/render.vs",
+                                    QString(SOURCE_DIRECTORY) + "shaders/render.fs");
+    shadowmapShader = compileShader(QString(SOURCE_DIRECTORY) + "shaders/shadow_maps.vs",
+                                    QString(SOURCE_DIRECTORY) + "shaders/shadow_maps.fs");
 
     // Initialize FBO
     depthFBO        = new QOpenGLFramebufferObject(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, QOpenGLFramebufferObject::Attachment::Depth, GL_TEXTURE_2D);
@@ -241,7 +244,7 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     //drawVBO(shadowmapShader, floorVBO);
 
     QImage depthImage = depthFBO->toImage();
-    depthImage.save("depth.png");
+    depthImage.save(QString(OUTPUT_DIRECTORY) + "depth.png");
     setTexture(depthTexture, depthImage);
 
     // Normal
@@ -251,7 +254,7 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     drawVBO(shadowmapShader, floorVBO);
     
     QImage normalImage = depthFBO->toImage();
-    normalImage.save("normal.png");
+    normalImage.save(QString(OUTPUT_DIRECTORY) + "normal.png");
     setTexture(normalTexture, normalImage);
 
     // Position
@@ -261,7 +264,7 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     drawVBO(shadowmapShader, floorVBO);
 
     QImage positionImage = depthFBO->toImage();
-    positionImage.save("position.png");
+    positionImage.save(QString(OUTPUT_DIRECTORY) + "position.png");
     setTexture(positionTexture, positionImage);
     
     // Albedo
@@ -271,7 +274,7 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     drawVBO(shadowmapShader, floorVBO);
     
     QImage albedoImage = depthFBO->toImage();
-    albedoImage.save("albedo.png");
+    albedoImage.save(QString(OUTPUT_DIRECTORY) + "albedo.png");
     setTexture(albedoTexture, albedoImage);
 
     depthFBO->release();

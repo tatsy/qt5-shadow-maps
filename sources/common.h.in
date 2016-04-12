@@ -1,7 +1,12 @@
+#ifdef _MSC_VER
+#pragma once
+#endif
+
 #ifndef _COMMON_H_
 #define _COMMON_H_
 
-const char* SOURCE_DIRECTORY = "@CMAKE_SOURCE_DIR@/sources/";
-const char* DATA_DIRECTORY = "@CMAKE_SOURCE_DIR@/data/";
+static const char* SOURCE_DIRECTORY = "@CMAKE_SOURCE_DIR@/sources/";
+static const char* DATA_DIRECTORY = "@CMAKE_SOURCE_DIR@/data/";
+static const char* OUTPUT_DIRECTORY = "@CMAKE_SOURCE_DIR@/output/";
 
 #endif // _COMMON_H_
