@@ -18,7 +18,7 @@ void main(void) {
         float depth = gl_FragCoord.z;
         color = vec4(depth, depth, depth, 1.0);
     } else if (mode == MODE_NORMAL) {
-        color = vec4(normalWorldspace, 1.0);
+        color = vec4((normalWorldspace + 1.0) * 0.5, 1.0);
     } else if (mode == MODE_POSITON) {
         vec3 V = (vertexWorldspace + vec3(5.0, 5.0, 5.0)) / 10.0;
         color = vec4(V, 1.0);

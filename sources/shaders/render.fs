@@ -37,7 +37,7 @@ vec3 reflectiveSM(vec3 V, vec3 N) {
     vec3 ret = vec3(0.0, 0.0, 0.0);
     for (int i = 0; i < nSamples; i++) {
         vec2 coord = shadowCoord.st / shadowCoord.w + delta[i];
-        vec3 Np  = texture2D(normalMap, coord.xy).xyz;
+        vec3 Np  = texture2D(normalMap, coord.xy).xyz * 2.0 - 1.0;
         vec3 Vp  = texture2D(positionMap, coord.xy).xyz * 10.0 - vec3(5.0, 5.0, 5.0);
         vec3 Phi = texture2D(albedoMap, coord.xy).xyz;
         ret += Phi * max(0.0, dot(Np, V - Vp)) * max(0.0, dot(N, Vp - V)) / pow(length(V - Vp), 4.0);
