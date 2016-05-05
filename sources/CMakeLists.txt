@@ -8,12 +8,10 @@ set(SOURCES appmain.cc maingui.cc shadowmaps_widget.cc vbo.cc arcball_controller
 set(HEADERS maingui.h shadowmaps_widget.h vbo.h arcball_controller.h common.h)
 file(GLOB SHADERS "${CMAKE_CURRENT_LIST_DIR}/shaders/*.[vfg]s")
 
-include_directories(${GLEW_INCLUDE_DIRS})
-
 add_definitions(-D_USE_MATH_DEFINES)
 add_executable(${BUILD_TARGET} ${SOURCES} ${HEADERS} ${SHADERS})
 qt5_use_modules(${BUILD_TARGET} Widgets OpenGL)
-target_link_libraries(${BUILD_TARGET} ${QT_LIBRARIES} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES})
+target_link_libraries(${BUILD_TARGET} ${QT_LIBRARIES} ${OPENGL_LIBRARIES})
 
 source_group("Source Files" FILES ${SOURCES} ${HEADERS})
 source_group("Shaders" FILES ${SHADERS})
