@@ -59,13 +59,13 @@ void main(void) {
   vec4 specular = specularColor * vec4(pow(max(0.0, NdotH), lightness));
   vec4 ambient = ambientColor;
 
-  float bias = 0.005;
+  float bias = tan(acos(max(0.0, dot(N, L)))) * 0.005;
   vec4 coord = shadowCoord / shadowCoord.w;
   float distFromLight = texture2D(depthMap, coord.xy).z + bias;
 
   float shadow = 1.0;
   if (receiveShadow != 0 && shadowCoord.w > 0.0) {
-    shadow = distFromLight < coord.z ? 0.5 : 1.0;
+     shadow = distFromLight < coord.z ? 0.5 : 1.0;
   }
 
   if (mode == MODE_SM) {

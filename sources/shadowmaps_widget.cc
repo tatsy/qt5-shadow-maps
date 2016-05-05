@@ -39,30 +39,19 @@ const QVector3D ShadowMapsWidget::LIGHT_POSITION = QVector3D(2.0f, 8.0f, 10.0f);
 
 ShadowMapsWidget::ShadowMapsWidget(QWidget* parent)
     : QOpenGLWidget(parent)
-    , renderShader(NULL)
-    , shadowmapShader(NULL)
+    , QOpenGLFunctions()
     , objectVBO()
-    , floorVBO()
-    , depthFBO(NULL)
-    , depthTexture(NULL)
-    , arcball(NULL) {
+    , floorVBO() {
     setWindowTitle("Qt5 Shadow Maps (SM)");
 
-    arcball = new ArcballController(this);
-    camera.eye = QVector3D(10.0f, 10.0f, 10.0f);
+    arcball = std::make_unique<ArcballController>(this);
+    camera.eye  = QVector3D(10.0f, 10.0f, 10.0f);
     camera.look = QVector3D(0.0f, 0.0f, 0.0f);
-    camera.up = QVector3D(0.0f, 1.0f, 0.0f);
+    camera.up   = QVector3D(0.0f, 1.0f, 0.0f);
 }
 
 ShadowMapsWidget::~ShadowMapsWidget() {
     makeCurrent();
-
-    delete renderShader;
-    delete shadowmapShader;
-    delete depthFBO;
-    delete depthTexture;
-    delete arcball;
-
     doneCurrent();
 }
 
@@ -72,6 +61,8 @@ void ShadowMapsWidget::setShadowMode(ShadowMaps mode) {
 
 void ShadowMapsWidget::initializeGL() {
     showInfo();
+
+    initializeOpenGLFunctions();
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
@@ -94,11 +85,22 @@ void ShadowMapsWidget::initializeGL() {
                                     QString(SOURCE_DIRECTORY) + "shaders/ism.gs");
 
     // Initialize FBO
-    depthFBO        = new QOpenGLFramebufferObject(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, QOpenGLFramebufferObject::Attachment::Depth, GL_TEXTURE_2D);
-    depthTexture    = new QOpenGLTexture(QOpenGLTexture::Target::Target2D);
-    normalTexture   = new QOpenGLTexture(QOpenGLTexture::Target::Target2D);
-    positionTexture = new QOpenGLTexture(QOpenGLTexture::Target::Target2D);
-    albedoTexture   = new QOpenGLTexture(QOpenGLTexture::Target::Target2D);
+    depthFBO = std::make_unique<QOpenGLFramebufferObject>(
+        SHADOW_MAP_SIZE, SHADOW_MAP_SIZE,
+        QOpenGLFramebufferObject::Attachment::Depth,
+        GL_TEXTURE_2D, GL_RGBA32F);
+    positionFBO = std::make_unique<QOpenGLFramebufferObject>(
+        SHADOW_MAP_SIZE, SHADOW_MAP_SIZE,
+        QOpenGLFramebufferObject::Attachment::Depth,
+        GL_TEXTURE_2D, GL_RGBA32F);
+    normalFBO = std::make_unique<QOpenGLFramebufferObject>(
+        SHADOW_MAP_SIZE, SHADOW_MAP_SIZE,
+        QOpenGLFramebufferObject::Attachment::Depth,
+        GL_TEXTURE_2D, GL_RGBA32F);
+    albedoFBO = std::make_unique<QOpenGLFramebufferObject>(
+        SHADOW_MAP_SIZE, SHADOW_MAP_SIZE,
+        QOpenGLFramebufferObject::Attachment::Depth,
+        GL_TEXTURE_2D, GL_RGBA32F);
 
     // Initialize arcball controller
     QMatrix4x4 modelMat, viewMat;
@@ -112,8 +114,8 @@ void ShadowMapsWidget::paintGL() {
     static QMatrix4x4 depthMVP;
     if (depthMVP.isIdentity()) {
         shadowMapping(&depthMVP);
-        std::vector<QMatrix4x4> mvps;
-        imperfectShadowMapping(std::vector<QVector3D>(), &mvps);
+        //std::vector<QMatrix4x4> mvps;
+        //imperfectShadowMapping(std::vector<QVector3D>(), &mvps);
     }
 
     // Draw scene
@@ -167,10 +169,6 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
     // Set uniform variables
     makeCurrent();
     renderShader->bind();
-    depthTexture->bind(0);
-    normalTexture->bind(1);
-    positionTexture->bind(2);
-    albedoTexture->bind(3);
 
     // Compute sampling pattern
     const int nSamples = 256;
@@ -185,10 +183,22 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
         }
     }
 
-    renderShader->setUniformValue("depthMap", 0);
-    renderShader->setUniformValue("normalMap", 1);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, depthFBO->texture());
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, normalFBO->texture());
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, positionFBO->texture());
+
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, albedoFBO->texture());
+
+    renderShader->setUniformValue("depthMap",    0);
+    renderShader->setUniformValue("normalMap",   1);
     renderShader->setUniformValue("positionMap", 2);
-    renderShader->setUniformValue("albedoMap", 3);
+    renderShader->setUniformValue("albedoMap",   3);
 
     renderShader->setUniformValue("projectionMatrix", projectionMatrix);
     renderShader->setUniformValue("modelviewMatrix", modelviewMatrix);
@@ -207,15 +217,11 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
     renderShader->setUniformValue("mode", (int)shadowMode);
 
     renderShader->setUniformValue("receiveShadow", 0);
-    drawVBO(renderShader, objectVBO);
+    drawVBO(renderShader.get(), objectVBO);
     renderShader->setUniformValue("receiveShadow", 1);
-    drawVBO(renderShader, floorVBO);
+    drawVBO(renderShader.get(), floorVBO);
 
     renderShader->release();
-    depthTexture->release();
-    normalTexture->release();
-    positionTexture->release();
-    albedoTexture->release();
 }
 
 void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
@@ -223,7 +229,6 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
 
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
 
-    depthFBO->bind();
     shadowmapShader->bind();
 
     projectionMatrix.ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.0f, 25.0f);
@@ -240,49 +245,52 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     shadowmapShader->setUniformValue("cameraPosition", LIGHT_POSITION);
     
     // Depth
+    depthFBO->bind();
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     shadowmapShader->setUniformValue("mode", (int)DrawMode::Depth);
-    drawVBO(shadowmapShader, objectVBO);
+    drawVBO(shadowmapShader.get(), objectVBO);
+    depthFBO->release();
     //drawVBO(shadowmapShader, floorVBO);
 
     QImage depthImage = depthFBO->toImage();
     depthImage.save(QString(OUTPUT_DIRECTORY) + "depth.png");
-    setTexture(depthTexture, depthImage);
 
     // Normal
+    normalFBO->bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shadowmapShader->setUniformValue("mode", (int)DrawMode::Normal);
     //drawVBO(shadowmapShader, objectVBO);
-    drawVBO(shadowmapShader, floorVBO);
+    drawVBO(shadowmapShader.get(), floorVBO);
+    normalFBO->release();
     
-    QImage normalImage = depthFBO->toImage();
+    QImage normalImage = normalFBO->toImage();
     normalImage.save(QString(OUTPUT_DIRECTORY) + "normal.png");
-    setTexture(normalTexture, normalImage);
 
     // Position
+    positionFBO->bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shadowmapShader->setUniformValue("mode", (int)DrawMode::Position);
     //drawVBO(shadowmapShader, objectVBO);
-    drawVBO(shadowmapShader, floorVBO);
+    drawVBO(shadowmapShader.get(), floorVBO);
+    positionFBO->release();
 
-    QImage positionImage = depthFBO->toImage();
+    QImage positionImage = positionFBO->toImage();
     positionImage.save(QString(OUTPUT_DIRECTORY) + "position.png");
-    setTexture(positionTexture, positionImage);
     
     // Albedo
+    albedoFBO->bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shadowmapShader->setUniformValue("mode", (int)DrawMode::Albedo);
     //drawVBO(shadowmapShader, objectVBO);
-    drawVBO(shadowmapShader, floorVBO);
+    drawVBO(shadowmapShader.get(), floorVBO);
+    albedoFBO->release();
     
-    QImage albedoImage = depthFBO->toImage();
+    QImage albedoImage = albedoFBO->toImage();
     albedoImage.save(QString(OUTPUT_DIRECTORY) + "albedo.png");
-    setTexture(albedoTexture, albedoImage);
 
-    depthFBO->release();
     shadowmapShader->release();
 
     glViewport(0, 0, width(), height());
@@ -312,15 +320,15 @@ void ShadowMapsWidget::imperfectShadowMapping(
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shadowmapShader->setUniformValue("mode", (int)DrawMode::Depth);
-    drawVBO(shadowmapShader, floorVBO);
-    drawVBO(shadowmapShader, objectVBO);
+    drawVBO(shadowmapShader.get(), floorVBO);
+    drawVBO(shadowmapShader.get(), objectVBO);
     QImage depthImage = depthFBO->toImage();
     depthImage.save(QString(OUTPUT_DIRECTORY) + "depthISM.png");
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shadowmapShader->setUniformValue("mode", (int)DrawMode::Normal);
-    drawVBO(shadowmapShader, floorVBO);
-    drawVBO(shadowmapShader, objectVBO);
+    drawVBO(shadowmapShader.get(), floorVBO);
+    drawVBO(shadowmapShader.get(), objectVBO);
     QImage normalImage = depthFBO->toImage();
     normalImage.save(QString(OUTPUT_DIRECTORY) + "normalISM.png");
 
@@ -364,8 +372,8 @@ void ShadowMapsWidget::imperfectShadowMapping(
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    drawVBO(ismShader, floorVBO);
-    drawVBO(ismShader, objectVBO);
+    drawVBO(ismShader.get(), floorVBO);
+    drawVBO(ismShader.get(), objectVBO);
     
     depthFBO->toImage().save(QString(OUTPUT_DIRECTORY) + "ism.png");
 
@@ -414,11 +422,11 @@ void ShadowMapsWidget::setTexture(QOpenGLTexture* texture, const QImage& image) 
 
 }
 
-QOpenGLShaderProgram* ShadowMapsWidget::compileShader(
+std::unique_ptr<QOpenGLShaderProgram> ShadowMapsWidget::compileShader(
     const QString& vShaderFile,
     const QString& fShaderFile,
     const QString& gShaderFile) {
-    QOpenGLShaderProgram* shader = new QOpenGLShaderProgram();
+    auto shader = std::make_unique<QOpenGLShaderProgram>();
     shader->addShaderFromSourceFile(QOpenGLShader::Vertex, vShaderFile);
     shader->addShaderFromSourceFile(QOpenGLShader::Fragment, fShaderFile);
     if (gShaderFile != "") {

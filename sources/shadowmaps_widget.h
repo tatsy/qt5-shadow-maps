@@ -1,6 +1,8 @@
 #ifndef _SHADOW_MAPPING_WIDGET_H_
 #define _SHADOW_MAPPING_WIDGET_H_
 
+#include <memory>
+
 #include <QtCore/qtimer.h>
 #include <QtCore/qvector.h>
 #include <QtWidgets/qwidget.h>
@@ -24,7 +26,7 @@ enum class ShadowMaps : int {
     RSM = 0x01
 };
 
-class ShadowMapsWidget : public QOpenGLWidget {
+class ShadowMapsWidget : public QOpenGLWidget, protected QOpenGLFunctions {
     Q_OBJECT
 
 public:
@@ -50,9 +52,10 @@ private:
                                 std::vector<QMatrix4x4>* vplMVP);
     void drawScene(const QMatrix4x4& depthMVP);
 
-    QOpenGLShaderProgram* compileShader(const QString& vShaderFile,
-                                        const QString& fShaderFile,
-                                        const QString& gShaderFile = "");
+    std::unique_ptr<QOpenGLShaderProgram> compileShader(
+        const QString& vShaderFile,
+        const QString& fShaderFile,
+        const QString& gShaderFile = "");
     void drawVBO(QOpenGLShaderProgram* const program, const VBO& vbo);
 
     void setTexture(QOpenGLTexture* texture, const QImage& image) const;
@@ -61,19 +64,18 @@ private:
     static const int SHADOW_MAP_SIZE = 1024;
     static const QVector3D LIGHT_POSITION;
 
-    QOpenGLShaderProgram* renderShader;
-    QOpenGLShaderProgram* shadowmapShader;
-    QOpenGLShaderProgram* ismShader;
+    std::unique_ptr<QOpenGLShaderProgram> renderShader    = nullptr;
+    std::unique_ptr<QOpenGLShaderProgram> shadowmapShader = nullptr;
+    std::unique_ptr<QOpenGLShaderProgram> ismShader = nullptr;
 
     VBO objectVBO;
     VBO floorVBO;
-    QOpenGLFramebufferObject* depthFBO;
-    QOpenGLTexture* depthTexture;
-    QOpenGLTexture* normalTexture;
-    QOpenGLTexture* positionTexture;
-    QOpenGLTexture* albedoTexture;
+    std::unique_ptr<QOpenGLFramebufferObject> depthFBO    = nullptr;
+    std::unique_ptr<QOpenGLFramebufferObject> positionFBO = nullptr;
+    std::unique_ptr<QOpenGLFramebufferObject> normalFBO   = nullptr;
+    std::unique_ptr<QOpenGLFramebufferObject> albedoFBO   = nullptr;
 
-    ArcballController* arcball;
+    std::unique_ptr<ArcballController> arcball = nullptr;
     Camera camera;
 
     ShadowMaps shadowMode = ShadowMaps::SM;
