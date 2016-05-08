@@ -5,12 +5,21 @@ qt5-shadow-maps
 
 > Shadow mapping implementation with Qt5 and OpenGL (Qt 5.4 or higher)
 
+# Algorithms
+
+* Ordinary shadow mapping for direct shadows
+* Reflective Shadow Maps [[Dachsbacher and Stamminger 2005]](http://dl.acm.org/citation.cfm?id=1053460)
+* Imperfect Shadow Maps [[Ritschel et al. 2008]](http://dl.acm.org/citation.cfm?id=1409082)
+
 ## Build
 
 Please use ```CMake 3.0.0``` or higher.
 
 ```shell
-$ cmake .
+$ git clone https://github.com/tatsy/qt5-shadow-maps.git
+$ mkdir build
+$ cd build
+$ cmake ..
 $ cmake --build .
 ```
 
@@ -19,6 +28,11 @@ $ cmake --build .
 | Shadow Maps                 | Reflective Shadow Maps    |
 |-----------------------------|---------------------------|
 | <img alt="SM" src="./results/sm.png" width="400"/> | <img alt="RSM" src="./results/rsm.png" width="400"/> |
+
+| Imperfect Shadow Maps       | Shadow Maps from VPLs     |
+|-----------------------------|---------------------------|
+| <img alt="SM" src="./results/ism.png" width="400"/> | <img alt="RSM" src="./results/vpls.png" width="400"/> |
+
 
 ## License
 

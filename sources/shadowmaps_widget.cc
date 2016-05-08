@@ -10,13 +10,6 @@
 
 namespace {
 
-QMatrix4x4 biasMat(
-    0.5f, 0.0f, 0.0f, 0.5f,
-    0.0f, 0.5f, 0.0f, 0.5f,
-    0.0f, 0.0f, 0.5f, 0.5f,
-    0.0f, 0.0f, 0.0f, 1.0f
-);
-
 enum class DrawMode : int {
     Depth = 0x00,
     Normal = 0x01,
@@ -35,7 +28,7 @@ void showInfo() {
 }  // anonymous namespace
 
 
-const QVector3D ShadowMapsWidget::LIGHT_POSITION = QVector3D(2.0f, 8.0f, 10.0f);
+const QVector3D ShadowMapsWidget::LIGHT_POSITION = QVector3D(0.0f, 4.9f, 0.0f);
 
 ShadowMapsWidget::ShadowMapsWidget(QWidget* parent)
     : QOpenGLWidget(parent)
@@ -45,7 +38,7 @@ ShadowMapsWidget::ShadowMapsWidget(QWidget* parent)
     setWindowTitle("Qt5 Shadow Maps (SM)");
 
     arcball = std::make_unique<ArcballController>(this);
-    camera.eye  = QVector3D(10.0f, 10.0f, 10.0f);
+    camera.eye  = QVector3D(0.0f, 0.0f, 15.0f);
     camera.look = QVector3D(0.0f, 0.0f, 0.0f);
     camera.up   = QVector3D(0.0f, 1.0f, 0.0f);
 }
@@ -80,9 +73,15 @@ void ShadowMapsWidget::initializeGL() {
                                     QString(SOURCE_DIRECTORY) + "shaders/render.fs");
     shadowmapShader = compileShader(QString(SOURCE_DIRECTORY) + "shaders/shadow_maps.vs",
                                     QString(SOURCE_DIRECTORY) + "shaders/shadow_maps.fs");
+    depthShader     = compileShader(QString(SOURCE_DIRECTORY) + "shaders/depth.vs",
+                                    QString(SOURCE_DIRECTORY) + "shaders/depth.fs");
+    normalShader    = compileShader(QString(SOURCE_DIRECTORY) + "shaders/normal.vs",
+                                    QString(SOURCE_DIRECTORY) + "shaders/normal.fs");
     ismShader       = compileShader(QString(SOURCE_DIRECTORY) + "shaders/ism.vs",
                                     QString(SOURCE_DIRECTORY) + "shaders/ism.fs",
                                     QString(SOURCE_DIRECTORY) + "shaders/ism.gs");
+    ismRenderShader = compileShader(QString(SOURCE_DIRECTORY) + "shaders/ismrender.vs",
+                                    QString(SOURCE_DIRECTORY) + "shaders/ismrender.fs");
 
     // Initialize FBO
     depthFBO = std::make_unique<QOpenGLFramebufferObject>(
@@ -112,10 +111,15 @@ void ShadowMapsWidget::initializeGL() {
 void ShadowMapsWidget::paintGL() {
     // Compute shadow maps   
     static QMatrix4x4 depthMVP;
+    static std::vector<VPL> vpls;
     if (depthMVP.isIdentity()) {
         shadowMapping(&depthMVP);
-        //std::vector<QMatrix4x4> mvps;
-        //imperfectShadowMapping(std::vector<QVector3D>(), &mvps);
+        imperfectShadowMapping(&vpls);
+    }
+
+    // Draw ISM
+    if (shadowMode == ShadowMaps::ISM) {
+        drawISM(vpls);
     }
 
     // Draw scene
@@ -164,8 +168,6 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
     modelviewMatrix = arcball->modelviewMatrix();
     normalMatrix = modelviewMatrix.transposed().inverted();
 
-    QMatrix4x4 depthBiasMVP = biasMat * depthMVP;
-
     // Set uniform variables
     makeCurrent();
     renderShader->bind();
@@ -176,7 +178,7 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
     if (randoms.empty()) {
         randoms.resize(nSamples);
         srand((unsigned long)time(0));
-        for (int i = 0; i < 256; i++) {
+        for (int i = 0; i < nSamples; i++) {
             double r0 = rand() / (float)RAND_MAX;
             double r1 = rand() / (float)RAND_MAX;
             randoms[i] = QVector2D(r0 * cos(2.0 * M_PI * r1), r0 * sin(2.0 * M_PI * r1));
@@ -195,21 +197,28 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, albedoFBO->texture());
 
+    if (shadowMode == ShadowMaps::ISM) {
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, indirectFBO->texture());
+    }
+
     renderShader->setUniformValue("depthMap",    0);
     renderShader->setUniformValue("normalMap",   1);
     renderShader->setUniformValue("positionMap", 2);
     renderShader->setUniformValue("albedoMap",   3);
+    renderShader->setUniformValue("indirectMap", 4);
 
     renderShader->setUniformValue("projectionMatrix", projectionMatrix);
     renderShader->setUniformValue("modelviewMatrix", modelviewMatrix);
     renderShader->setUniformValue("normalMatrix", normalMatrix);
-    renderShader->setUniformValue("depthBiasMVP", depthBiasMVP);
+    renderShader->setUniformValue("depthMVP", depthMVP);
 
+    renderShader->setUniformValue("Le", QVector3D(4.0f, 4.0f, 4.0f));
     renderShader->setUniformValue("cameraPosition", camera.eye);
     renderShader->setUniformValue("lightPosition", LIGHT_POSITION);
 
     renderShader->setUniformValue("nSamples", nSamples);
-    renderShader->setUniformValueArray("delta", &randoms[0], 256);
+    renderShader->setUniformValueArray("delta", &randoms[0], nSamples);
 
     // Draw scene
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -224,6 +233,110 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
     renderShader->release();
 }
 
+void ShadowMapsWidget::drawISM(const std::vector<VPL>& VPLs) {
+    QOpenGLFramebufferObject renderFBO1(width(), height(),
+        QOpenGLFramebufferObject::Attachment::Depth, GL_TEXTURE_2D, GL_RGBA32F);
+    QOpenGLFramebufferObject renderFBO2(width(), height(),
+        QOpenGLFramebufferObject::Attachment::Depth, GL_TEXTURE_2D, GL_RGBA32F);
+    indirectFBO = std::make_unique<QOpenGLFramebufferObject>(width(), height(),
+        QOpenGLFramebufferObject::Attachment::Depth, GL_TEXTURE_2D, GL_RGBA32F);
+
+    QMatrix4x4 projMat, mvMat, mvpMat;
+    projMat.perspective(45.0f, (float)width() / (float)height(), 1.0f, 1000.0f);
+    mvMat = arcball->modelviewMatrix();
+    mvpMat = projMat * mvMat;
+
+    const int nVPL = (int)VPLs.size();
+
+    makeCurrent();
+    ismRenderShader->bind();
+
+    glViewport(0, 0, width(), height());
+
+    const int ismCols = 32;
+    const int ismRows = 32;
+
+    std::vector<QVector3D> posVPLs(ismCols);
+    std::vector<QVector3D> nrmVPLs(ismCols);
+    std::vector<QVector3D> albVPLs(ismCols);
+    std::vector<QMatrix4x4> mvVPLs(ismCols);
+
+    renderFBO1.bind();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    renderFBO1.release();
+
+    renderFBO2.bind();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    renderFBO2.release();
+
+    indirectFBO->bind();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    indirectFBO->release();
+
+    int currentRow = 0;
+    for (int i = 0; i < nVPL; i += ismCols, currentRow++) {
+        if (currentRow % 2 == 0) {
+            if (currentRow == ismRows - 1) {
+                indirectFBO->bind();
+            } else {
+                renderFBO1.bind();
+            }
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, ismFBO->texture());
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, renderFBO2.texture());
+        } else {
+            if (currentRow == ismRows - 1) {
+                indirectFBO->bind();
+            } else {
+                renderFBO2.bind();
+            }
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, ismFBO->texture());
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, renderFBO1.texture());        
+        }
+
+        ismRenderShader->setUniformValue("mvpMat", mvpMat);
+        ismRenderShader->setUniformValue("lightPosition", LIGHT_POSITION);
+        ismRenderShader->setUniformValue("currentRow", currentRow);
+        ismRenderShader->setUniformValue("ismRows", ismRows);
+        ismRenderShader->setUniformValue("ismCols", ismCols);
+        ismRenderShader->setUniformValue("maxDepth", 20.0f);
+        ismRenderShader->setUniformValue("ismTexture", 0);
+        ismRenderShader->setUniformValue("accumTexture", 1);
+
+        for (int j = 0; j < ismCols; j++) {
+            posVPLs[j] = VPLs[j].pos;
+            nrmVPLs[j] = VPLs[j].nrm;
+            albVPLs[j] = VPLs[j].albedo;
+            mvVPLs[j] = VPLs[j].mvMat;
+        }
+
+        ismRenderShader->setUniformValueArray("posVPL", &posVPLs[0], ismCols);
+        ismRenderShader->setUniformValueArray("nrmVPL", &nrmVPLs[0], ismCols);
+        ismRenderShader->setUniformValueArray("albVPL", &albVPLs[0], ismCols);
+        ismRenderShader->setUniformValueArray("mvVPL", &mvVPLs[0], ismCols);
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        drawVBO(ismRenderShader.get(), objectVBO);
+        drawVBO(ismRenderShader.get(), floorVBO);
+
+        if (currentRow == ismRows - 1) {
+            indirectFBO->release();
+        } else {
+            if (currentRow % 2 == 0) {
+                renderFBO1.release();
+            } else {
+                renderFBO2.release();
+            }
+        }
+    }
+
+    ismRenderShader->release();
+    indirectFBO->toImage().save(QString(OUTPUT_DIRECTORY) + "indirect.png");
+}
+
 void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     QMatrix4x4 projectionMatrix, modelviewMatrix, normalMatrix;
 
@@ -231,10 +344,10 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
 
     shadowmapShader->bind();
 
-    projectionMatrix.ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.0f, 25.0f);
+    projectionMatrix.perspective(90.0f, 1.0f, 0.1f, 100.0f);
     modelviewMatrix.lookAt(LIGHT_POSITION,
                            QVector3D(0.0f, 0.0f, 0.0f),
-                           QVector3D(0.0f, 1.0f, 0.0f));
+                           QVector3D(1.0f, 0.0f, 0.0f));
 
     *depthMVP = projectionMatrix * modelviewMatrix;
     normalMatrix = modelviewMatrix.transposed().inverted();
@@ -297,88 +410,213 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
 }
 
 void ShadowMapsWidget::imperfectShadowMapping(
-    const std::vector<QVector3D>& vplPositions,
-    std::vector<QMatrix4x4>* mvpVPL) {
+    std::vector<VPL>* vpls) {
 
-    static const int nVPL = 64;
+    static const int nVPL = 1024;
+    static const double maxArea = 0.01;
 
-    // Compute ordinary depth/normal map for VPL collection
+    // Prepare point cloud
+    std::vector<QVector3D> vertices;
+    std::vector<unsigned int> indices;
+    srand((unsigned long)time(0));
+    for (const auto& t : objectVBO.indices()) {
+        QVector3D v0 = objectVBO.vertices()[t.i];
+        QVector3D v1 = objectVBO.vertices()[t.j];
+        QVector3D v2 = objectVBO.vertices()[t.k];
+        double area = 0.5 * QVector3D::crossProduct(v1 - v0, v2 - v0).length();
+        const int nv = std::max(1, (int)(area / maxArea + 0.5));
+        for (int i = 0; i < nv; i++) {
+            double r1 = (double)rand() / RAND_MAX;            
+            double r2 = (double)rand() / RAND_MAX;
+            if (r1 + r2 > 1.0) {
+                r1 = 1.0 - r1;
+                r2 = 1.0 - r2;
+            }
+
+            QVector3D pos = (1.0 - r1 - r2) * v0 + r1 * v1 + r2 * v2;
+            vertices.push_back(pos);
+            indices.push_back(indices.size());
+        }
+    }
+
+    for (const auto& t : floorVBO.indices()) {
+        QVector3D v0 = floorVBO.vertices()[t.i];
+        QVector3D v1 = floorVBO.vertices()[t.j];
+        QVector3D v2 = floorVBO.vertices()[t.k];
+        double area = 0.5 * QVector3D::crossProduct(v1 - v0, v2 - v0).length();
+        const int nv = std::max(1, (int)(area / maxArea + 0.5));
+        for (int i = 0; i < nv; i++) {
+            double r1 = (double)rand() / RAND_MAX;            
+            double r2 = (double)rand() / RAND_MAX;
+            if (r1 + r2 > 1.0) {
+                r1 = 1.0 - r1;
+                r2 = 1.0 - r2;
+            }
+
+            QVector3D pos = (1.0 - r1 - r2) * v0 + r1 * v1 + r2 * v2;
+            vertices.push_back(pos);
+            indices.push_back(indices.size());
+        }
+    }
+
+    QOpenGLFramebufferObject fbo(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE,
+        QOpenGLFramebufferObject::Attachment::Depth, GL_TEXTURE_2D);
+
+    // Compute ordinary position/normal map for VPL collection
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-    depthFBO->bind();
-    shadowmapShader->bind();
 
-    QMatrix4x4 projectionMatrix, modelviewMatrix, normalMatrix;
-    modelviewMatrix.lookAt(LIGHT_POSITION, QVector3D(0.0, 0.0, 0.0), QVector3D(0.0, 1.0, 0.0));
-    projectionMatrix.ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.0f, 25.0f);
+    QMatrix4x4 projMat, mvMat, mvpMat, normalMat;
+    projMat.perspective(85.0f, 1.0f, 0.1f, 100.0f);
+    mvMat.lookAt(LIGHT_POSITION, QVector3D(0.0, 0.0, 0.0), QVector3D(1.0, 0.0, 0.0));
 
-    normalMatrix = modelviewMatrix.transposed().inverted();
+    mvpMat = projMat * mvMat;
+    normalMat = mvMat.transposed().inverted();
 
-    shadowmapShader->setUniformValue("projectionMatrix", projectionMatrix);
-    shadowmapShader->setUniformValue("modelviewMatrix", modelviewMatrix);
-    shadowmapShader->setUniformValue("normalMatrix", normalMatrix);
-    shadowmapShader->setUniformValue("cameraPosition", LIGHT_POSITION);
+    QImage depthImage;
+    {
+        depthShader->bind();
+        fbo.bind();
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    shadowmapShader->setUniformValue("mode", (int)DrawMode::Depth);
-    drawVBO(shadowmapShader.get(), floorVBO);
-    drawVBO(shadowmapShader.get(), objectVBO);
-    QImage depthImage = depthFBO->toImage();
-    depthImage.save(QString(OUTPUT_DIRECTORY) + "depthISM.png");
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    shadowmapShader->setUniformValue("mode", (int)DrawMode::Normal);
-    drawVBO(shadowmapShader.get(), floorVBO);
-    drawVBO(shadowmapShader.get(), objectVBO);
-    QImage normalImage = depthFBO->toImage();
-    normalImage.save(QString(OUTPUT_DIRECTORY) + "normalISM.png");
+        depthShader->setUniformValue("mvpMat", mvpMat);
+
+        drawVBO(depthShader.get(), floorVBO);
+        drawVBO(depthShader.get(), objectVBO);
+
+        depthImage = fbo.toImage();
+        depthImage.save(QString(OUTPUT_DIRECTORY) + "depthISM.png");
+
+        depthShader->release();
+        fbo.release();
+    }
+
+    QImage normalImage;
+    {
+        shadowmapShader->bind();
+        fbo.bind();
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        shadowmapShader->setUniformValue("mvpMat", mvpMat);
+        shadowmapShader->setUniformValue("mode", (int)DrawMode::Normal);
+
+        drawVBO(shadowmapShader.get(), floorVBO);
+        drawVBO(shadowmapShader.get(), objectVBO);
+
+        normalImage = fbo.toImage();
+        normalImage.save(QString(OUTPUT_DIRECTORY) + "normalISM.png");
+
+        shadowmapShader->release();
+        fbo.release();
+    }
+
+    QImage albedoImage;
+    {
+        shadowmapShader->bind();
+        fbo.bind();
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        shadowmapShader->setUniformValue("mvpMat", mvpMat);
+        shadowmapShader->setUniformValue("mode", (int)DrawMode::Albedo);
+
+        drawVBO(shadowmapShader.get(), floorVBO);
+        drawVBO(shadowmapShader.get(), objectVBO);
+
+        albedoImage = fbo.toImage();
+        albedoImage.save(QString(OUTPUT_DIRECTORY) + "albedoISM.png");
+
+        shadowmapShader->release();
+        fbo.release();
+    }
 
     std::vector<QVector3D> vplPos;
     std::vector<QVector3D> vplNrm;
-    srand((unsigned long)time(0));
+    std::vector<QVector3D> vplAlb;
     while (vplPos.size() < nVPL) {
-        int rx = rand() % SHADOW_MAP_SIZE;
-        int ry = rand() % SHADOW_MAP_SIZE;
-        float depth = qGray(depthImage.pixel(rx, ry)) / 255.0f;
-        if (depth == 0.0f) continue;
+        const int rx = rand() % SHADOW_MAP_SIZE;
+        const int ry = rand() % SHADOW_MAP_SIZE;
+        const double px = 2.0 * rx / SHADOW_MAP_SIZE - 1.0;
+        const double py = 1.0 - 2.0 * ry / SHADOW_MAP_SIZE;
 
-        QVector4D vec(2.0 * rx / SHADOW_MAP_SIZE - 1.0, 2.0 * ry / SHADOW_MAP_SIZE - 1.0, depth, 1.0f);
-        QVector4D pos = (projectionMatrix * modelviewMatrix).inverted() * vec;
-        if (pos.w() != 0.0) {
-            vplPos.emplace_back(pos.x() / pos.w(), pos.y() / pos.w(), pos.z() / pos.w());
-
-            QColor nrm = QColor(normalImage.pixel(rx, ry));
-            vplNrm.emplace_back(2.0f * nrm.redF() - 1.0f, 2.0f * nrm.greenF() - 1.0f, 2.0f * nrm.blueF() - 1.0f);
+        QColor rgb;
+        rgb = QColor::fromRgba(depthImage.pixel(rx, ry));
+        const double pz = rgb.redF() + rgb.greenF() / 255.0 + rgb.blueF() / (255.0 * 255.0);
+        if (pz > 0.999) {
+            continue;
         }
+
+        rgb = QColor::fromRgba(normalImage.pixel(rx, ry));
+        
+        QVector3D pos(px, py, pz);
+        pos = mvpMat.inverted() * pos;
+        QVector3D nrm = QVector3D(2.0 * rgb.redF() - 1.0, rgb.greenF() * 2.0 - 1.0, rgb.blueF() * 2.0 - 1.0);
+
+        rgb = QColor::fromRgba(albedoImage.pixel(rx, ry));
+
+        QVector3D alb = QVector3D(rgb.redF(), rgb.greenF(), rgb.blueF());
+
+        vplPos.push_back(pos);
+        vplNrm.push_back(nrm);
+        vplAlb.push_back(alb);
     }
-    shadowmapShader->release();
 
     // Compute SM from VPLs
-    depthFBO->bind();
+    static const int ismRes = 128;
+    static const int ismRows = 32;
+    static const int ismCols = 32;
+    ismFBO = std::make_unique<QOpenGLFramebufferObject>(
+        ismRes * ismCols, ismRes * ismRows,
+        QOpenGLFramebufferObject::Attachment::Depth, GL_TEXTURE_2D, GL_RGBA32F);
+
     ismShader->bind();
+    ismFBO->bind();
 
-    mvpVPL->resize(nVPL);
-    for (int i = 0; i < nVPL; i++) {
-        QMatrix4x4 mvMat, pMat;
-        mvMat.lookAt(vplPos[i], vplPos[i] + vplNrm[i], QVector3D(0.0, 1.0, 0.0));
-        //mvMat.lookAt(LIGHT_POSITION, QVector3D(0.0, 0.0, 0.0), QVector3D(0.0, 1.0, 0.0));
-        pMat.ortho(-10.0f, 10.0f, -10.0f, 10.0f, -10.0f, 10.0f);
-        (*mvpVPL)[i] = pMat * mvMat;
-    }
-
-    ismShader->setUniformValue("smRows", 8);
-    ismShader->setUniformValue("smCols", 8);
-    ismShader->setUniformValueArray("mvpVPL", &(*mvpVPL)[0], nVPL);
-
+    glViewport(0, 0, ismRes * ismCols, ismRes * ismRows);
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    drawVBO(ismShader.get(), floorVBO);
-    drawVBO(ismShader.get(), objectVBO);
-    
-    depthFBO->toImage().save(QString(OUTPUT_DIRECTORY) + "ism.png");
 
-    depthFBO->release();
+    vpls->clear();
+    std::vector<QMatrix4x4> mvVPLs(nVPL);
+    for (int i = 0; i < nVPL; i++) {
+        QVector3D up = std::abs(vplNrm[i].y()) < 0.1f ? QVector3D(0.0f, 1.0f, 0.0f) : QVector3D(1.0f, 0.0f, 0.0f);
+        mvVPLs[i].lookAt(vplPos[i] + 0.05 * vplNrm[i], vplPos[i] + vplNrm[i], up);
+        vpls->emplace_back(vplPos[i], vplNrm[i], vplAlb[i], mvVPLs[i]);
+    }
+
+    int currentRow = 0;
+    for (int i = 0; i < nVPL; i += ismCols, currentRow++) {
+        ismShader->setUniformValue("currentRow", currentRow);
+        ismShader->setUniformValue("ismRows", ismRows);
+        ismShader->setUniformValue("ismCols", ismCols);
+        ismShader->setUniformValue("maxDepth", 20.0f);
+        ismShader->setUniformValueArray("mvVPL", &mvVPLs[0] + i, ismCols);
+
+        ismShader->setAttributeArray("vertices", &vertices[0]);
+        ismShader->enableAttributeArray("vertices");
+
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glEnable(GL_POINT_SPRITE);
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        glDrawElements(GL_POINTS, indices.size(), GL_UNSIGNED_INT, &indices[0]);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_POINT_SIZE);
+        glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
+
+        ismShader->disableAttributeArray("vertices");
+    }
+    
+    ismFBO->toImage().save(QString(OUTPUT_DIRECTORY) + "ism.png");
+
     ismShader->release();
+    ismFBO->release();
 
     glViewport(0, 0, width(), height());
 }
@@ -392,7 +630,12 @@ void ShadowMapsWidget::drawVBO(QOpenGLShaderProgram* const shader, const VBO& vb
     shader->setAttributeArray("normals", &vbo.normals()[0]);
     shader->setAttributeArray("colors", &vbo.colors()[0]);
 
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
     glDrawElements(GL_TRIANGLES, vbo.indices().size() * 3, GL_UNSIGNED_INT, (unsigned int*)&vbo.indices()[0]);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
 
     shader->disableAttributeArray("vertices");
     shader->disableAttributeArray("normals");

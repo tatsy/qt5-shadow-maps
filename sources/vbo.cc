@@ -119,64 +119,107 @@ VBO VBO::fromObjFile(const char* filename, const QVector3D color) {
 VBO VBO::colorBox() {
     VBO vbo;
     double size = 5.0;
-    
-    // Red
+
+    // Back
+    unsigned int idx = 0u;
     vbo._vertices.push_back(QVector3D(-size, -size, -size));
-    vbo._vertices.push_back(QVector3D(size, -size, -size));
-    vbo._vertices.push_back(QVector3D(size, size, -size));
+    vbo._vertices.push_back(QVector3D( size, -size, -size));
+    vbo._vertices.push_back(QVector3D( size,  size, -size));
+    vbo._vertices.push_back(QVector3D(-size,  size, -size));
+
+    vbo._normals.push_back(QVector3D(0.0, 0.0, 1.0));
+    vbo._normals.push_back(QVector3D(0.0, 0.0, 1.0));
+    vbo._normals.push_back(QVector3D(0.0, 0.0, 1.0));
+    vbo._normals.push_back(QVector3D(0.0, 0.0, 1.0));
+
+    vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
+    vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
+    vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
+    vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
+
+    vbo._indices.push_back({ idx + 0, idx + 1, idx + 2 });
+    vbo._indices.push_back({ idx + 0, idx + 2, idx + 3 });
+    idx += 4;
+
+    // Floor
+    vbo._vertices.push_back(QVector3D(-size, -size, -size));
+    vbo._vertices.push_back(QVector3D( size, -size, -size));
+    vbo._vertices.push_back(QVector3D( size, -size,  size));
+    vbo._vertices.push_back(QVector3D(-size, -size,  size));
+
+    vbo._normals.push_back(QVector3D(0.0, 1.0, 0.0));
+    vbo._normals.push_back(QVector3D(0.0, 1.0, 0.0));
+    vbo._normals.push_back(QVector3D(0.0, 1.0, 0.0));
+    vbo._normals.push_back(QVector3D(0.0, 1.0, 0.0));
+
+    vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
+    vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
+    vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
+    vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
+
+    vbo._indices.push_back({ idx + 0, idx + 2, idx + 1 });
+    vbo._indices.push_back({ idx + 0, idx + 3, idx + 2 });
+    idx += 4;
+
+    // Ceil
     vbo._vertices.push_back(QVector3D(-size, size, -size));
+    vbo._vertices.push_back(QVector3D( size, size, -size));
+    vbo._vertices.push_back(QVector3D( size, size,  size));
+    vbo._vertices.push_back(QVector3D(-size, size,  size));
 
-    vbo._normals.push_back(QVector3D(0.0, 0.0, 1.0));
-    vbo._normals.push_back(QVector3D(0.0, 0.0, 1.0));
-    vbo._normals.push_back(QVector3D(0.0, 0.0, 1.0));
-    vbo._normals.push_back(QVector3D(0.0, 0.0, 1.0));
-
-    vbo._colors.push_back(QVector3D(1.0, 0.0, 0.0));
-    vbo._colors.push_back(QVector3D(1.0, 0.0, 0.0));
-    vbo._colors.push_back(QVector3D(1.0, 0.0, 0.0));
-    vbo._colors.push_back(QVector3D(1.0, 0.0, 0.0));
-
-    vbo._indices.push_back({ 0, 1, 2 });
-    vbo._indices.push_back({ 0, 2, 3 });
-
-    // Gray
-    vbo._vertices.push_back(QVector3D(-size, -size, -size));
-    vbo._vertices.push_back(QVector3D(size, -size, -size));
-    vbo._vertices.push_back(QVector3D(size, -size, size));
-    vbo._vertices.push_back(QVector3D(-size, -size, size));
-
-    vbo._normals.push_back(QVector3D(0.0, 1.0, 0.0));
-    vbo._normals.push_back(QVector3D(0.0, 1.0, 0.0));
-    vbo._normals.push_back(QVector3D(0.0, 1.0, 0.0));
-    vbo._normals.push_back(QVector3D(0.0, 1.0, 0.0));
+    vbo._normals.push_back(QVector3D(0.0, -1.0, 0.0));
+    vbo._normals.push_back(QVector3D(0.0, -1.0, 0.0));
+    vbo._normals.push_back(QVector3D(0.0, -1.0, 0.0));
+    vbo._normals.push_back(QVector3D(0.0, -1.0, 0.0));
 
     vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
     vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
     vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
     vbo._colors.push_back(QVector3D(0.5, 0.5, 0.5));
 
-    vbo._indices.push_back({ 4, 6, 5 });
-    vbo._indices.push_back({ 4, 7, 6 });
+    vbo._indices.push_back({ idx + 0, idx + 1, idx + 2 });
+    vbo._indices.push_back({ idx + 0, idx + 2, idx + 3 });
+    idx += 4;
 
     // Green
     vbo._vertices.push_back(QVector3D(-size, -size, -size));
-    vbo._vertices.push_back(QVector3D(-size, size, -size));
-    vbo._vertices.push_back(QVector3D(-size, size, size));
-    vbo._vertices.push_back(QVector3D(-size, -size, size));
+    vbo._vertices.push_back(QVector3D(-size,  size, -size));
+    vbo._vertices.push_back(QVector3D(-size,  size,  size));
+    vbo._vertices.push_back(QVector3D(-size, -size,  size));
 
     vbo._normals.push_back(QVector3D(1.0, 0.0, 0.0));
     vbo._normals.push_back(QVector3D(1.0, 0.0, 0.0));
     vbo._normals.push_back(QVector3D(1.0, 0.0, 0.0));
     vbo._normals.push_back(QVector3D(1.0, 0.0, 0.0));
 
-    vbo._colors.push_back(QVector3D(0.0, 1.0, 0.0));
-    vbo._colors.push_back(QVector3D(0.0, 1.0, 0.0));
-    vbo._colors.push_back(QVector3D(0.0, 1.0, 0.0));
-    vbo._colors.push_back(QVector3D(0.0, 1.0, 0.0));
+    vbo._colors.push_back(QVector3D(0.2, 0.2, 1.0));
+    vbo._colors.push_back(QVector3D(0.2, 0.2, 1.0));
+    vbo._colors.push_back(QVector3D(0.2, 0.2, 1.0));
+    vbo._colors.push_back(QVector3D(0.2, 0.2, 1.0));
 
-    vbo._indices.push_back({ 8, 9, 10 });
-    vbo._indices.push_back({ 8, 10, 11 });
+    vbo._indices.push_back({ idx + 0, idx + 1, idx + 2 });
+    vbo._indices.push_back({ idx + 0, idx + 2, idx + 3 });
+    idx += 4;
 
+    // Orange
+    vbo._vertices.push_back(QVector3D(size, -size, -size));
+    vbo._vertices.push_back(QVector3D(size,  size, -size));
+    vbo._vertices.push_back(QVector3D(size,  size,  size));
+    vbo._vertices.push_back(QVector3D(size, -size,  size));
+
+    vbo._normals.push_back(QVector3D(-1.0, 0.0, 0.0));
+    vbo._normals.push_back(QVector3D(-1.0, 0.0, 0.0));
+    vbo._normals.push_back(QVector3D(-1.0, 0.0, 0.0));
+    vbo._normals.push_back(QVector3D(-1.0, 0.0, 0.0));
+
+    vbo._colors.push_back(QVector3D(1.0, 0.5, 0.2));
+    vbo._colors.push_back(QVector3D(1.0, 0.5, 0.2));
+    vbo._colors.push_back(QVector3D(1.0, 0.5, 0.2));
+    vbo._colors.push_back(QVector3D(1.0, 0.5, 0.2));
+
+    vbo._indices.push_back({ idx + 0, idx + 2, idx + 1 });
+    vbo._indices.push_back({ idx + 0, idx + 3, idx + 2 });
+    idx += 4;
 
     return vbo;
 }

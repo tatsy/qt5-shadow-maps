@@ -23,7 +23,8 @@ public:
         , smTypeGroup{ new QGroupBox }
         , groupLayout{ new QVBoxLayout }
         , smRadioButton{ new QRadioButton }
-        , rsmRadioButton{ new QRadioButton } {        
+        , rsmRadioButton{ new QRadioButton }
+        , ismRadioButton{ new QRadioButton } {        
         setLayout(layout);
         layout->setAlignment(Qt::AlignTop);
 
@@ -35,6 +36,8 @@ public:
         groupLayout->addWidget(smRadioButton);
         rsmRadioButton->setText("RSM");
         groupLayout->addWidget(rsmRadioButton);
+        ismRadioButton->setText("ISM");
+        groupLayout->addWidget(ismRadioButton);
 
         // Save button
         saveButton->setText("Save");
@@ -56,6 +59,7 @@ public:
 
     QRadioButton* smRadioButton;
     QRadioButton* rsmRadioButton;
+    QRadioButton* ismRadioButton;
 };
 
 
@@ -85,6 +89,7 @@ MainGUI::MainGUI(QWidget* parent)
     connect(ifaceWidget->saveButton, SIGNAL(clicked()), this, SLOT(OnSaveButtonClicked()));
     connect(ifaceWidget->smRadioButton, SIGNAL(toggled(bool)), this, SLOT(OnRadioButtonChanged(bool)));
     connect(ifaceWidget->rsmRadioButton, SIGNAL(toggled(bool)), this, SLOT(OnRadioButtonChanged(bool)));
+    connect(ifaceWidget->ismRadioButton, SIGNAL(toggled(bool)), this, SLOT(OnRadioButtonChanged(bool)));
 }
 
 MainGUI::~MainGUI() {
@@ -110,6 +115,8 @@ void MainGUI::OnRadioButtonChanged(bool) {
         ((ShadowMapsWidget*)displayWidget)->setShadowMode(ShadowMaps::SM);
     } else if (ifaceWidget->rsmRadioButton->isChecked()) {
         ((ShadowMapsWidget*)displayWidget)->setShadowMode(ShadowMaps::RSM);
+    } else if (ifaceWidget->ismRadioButton->isChecked()) {
+        ((ShadowMapsWidget*)displayWidget)->setShadowMode(ShadowMaps::ISM);
     }
     displayWidget->update();
 }

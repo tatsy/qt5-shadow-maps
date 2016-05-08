@@ -7,17 +7,20 @@ in vec3 colors;
 uniform mat4 projectionMatrix;
 uniform mat4 modelviewMatrix;
 uniform mat4 normalMatrix;
-uniform mat4 depthBiasMVP;
+uniform mat4 depthMVP;
 
 uniform vec3 lightPosition;
 
 out vec3 vertexWorldspace;
 out vec3 normalWorldspace;
+out vec3 lightWorldspace;
 
 out vec3 vertexCameraspace;
 out vec3 normalCameraspace;
 out vec3 lightCameraspace;
 out vec3 vertexColor;
+
+out vec4 vertexScreenspace;
 
 out vec4 shadowCoord;
 
@@ -26,6 +29,7 @@ void main(void) {
 
   vertexWorldspace = vertices;
   normalWorldspace = normals;
+  lightWorldspace = lightPosition;
 
   vertexCameraspace = (modelviewMatrix * vec4(vertices, 1.0)).xyz;
   normalCameraspace = (normalMatrix * vec4(normals, 1.0)).xyz;
@@ -33,5 +37,7 @@ void main(void) {
 
   vertexColor = colors;
 
-  shadowCoord = depthBiasMVP * vec4(vertices, 1.0);
+  vertexScreenspace = gl_Position;
+
+  shadowCoord = depthMVP * vec4(vertices, 1.0);
 }

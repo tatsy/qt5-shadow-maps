@@ -21,9 +21,25 @@ struct Camera {
     QVector3D eye, look, up;
 };
 
+struct VPL {
+    QVector3D pos;
+    QVector3D nrm;
+    QVector3D albedo;
+    QMatrix4x4 mvMat;
+
+    explicit VPL(const QVector3D& pos_, const QVector3D& nrm_,
+                 const QVector3D& albedo_, const QMatrix4x4& mvMat_)
+        : pos{ pos_ }
+        , nrm{ nrm_ }
+        , albedo{ albedo_ }
+        , mvMat{ mvMat_ } {
+    }
+};
+
 enum class ShadowMaps : int {
     SM = 0x00,
-    RSM = 0x01
+    RSM = 0x01,
+    ISM = 0x02
 };
 
 class ShadowMapsWidget : public QOpenGLWidget, protected QOpenGLFunctions {
@@ -48,9 +64,9 @@ protected:
 private:
     // Private methods
     void shadowMapping(QMatrix4x4* depthMVP);
-    void imperfectShadowMapping(const std::vector<QVector3D>& vplPositions,
-                                std::vector<QMatrix4x4>* vplMVP);
+    void imperfectShadowMapping(std::vector<VPL>* vpls);
     void drawScene(const QMatrix4x4& depthMVP);
+    void drawISM(const std::vector<VPL>& mvVPLs);
 
     std::unique_ptr<QOpenGLShaderProgram> compileShader(
         const QString& vShaderFile,
@@ -66,7 +82,10 @@ private:
 
     std::unique_ptr<QOpenGLShaderProgram> renderShader    = nullptr;
     std::unique_ptr<QOpenGLShaderProgram> shadowmapShader = nullptr;
+    std::unique_ptr<QOpenGLShaderProgram> depthShader     = nullptr;
+    std::unique_ptr<QOpenGLShaderProgram> normalShader    = nullptr;
     std::unique_ptr<QOpenGLShaderProgram> ismShader = nullptr;
+    std::unique_ptr<QOpenGLShaderProgram> ismRenderShader = nullptr;
 
     VBO objectVBO;
     VBO floorVBO;
@@ -74,6 +93,8 @@ private:
     std::unique_ptr<QOpenGLFramebufferObject> positionFBO = nullptr;
     std::unique_ptr<QOpenGLFramebufferObject> normalFBO   = nullptr;
     std::unique_ptr<QOpenGLFramebufferObject> albedoFBO   = nullptr;
+    std::unique_ptr<QOpenGLFramebufferObject> ismFBO      = nullptr;
+    std::unique_ptr<QOpenGLFramebufferObject> indirectFBO = nullptr;
 
     std::unique_ptr<ArcballController> arcball = nullptr;
     Camera camera;
