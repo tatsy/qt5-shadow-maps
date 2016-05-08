@@ -5,11 +5,11 @@ qt5-shadow-maps
 
 > Shadow mapping implementation with Qt5 and OpenGL (Qt 5.4 or higher)
 
-# Algorithms
+## Algorithms
 
 * Ordinary shadow mapping for direct shadows
-* Reflective Shadow Maps [[Dachsbacher and Stamminger 2005]](http://dl.acm.org/citation.cfm?id=1053460)
-* Imperfect Shadow Maps [[Ritschel et al. 2008]](http://dl.acm.org/citation.cfm?id=1409082)
+* Reflective Shadow Maps <a href="http://dl.acm.org/citation.cfm?id=1053460" target="_blank">[Dachsbacher and Stamminger 2005]</a>
+* Imperfect Shadow Maps <a href="http://dl.acm.org/citation.cfm?id=1409082" target="_blank">[Ritschel et al. 2008]</a>
 
 ## Build
 
