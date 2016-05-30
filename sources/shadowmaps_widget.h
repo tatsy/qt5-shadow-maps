@@ -10,6 +10,8 @@
 
 #include <QtGui/qopenglfunctions.h>
 #include <QtGui/qopenglshaderprogram.h>
+#include <QtGui/qopenglvertexarrayobject.h>
+#include <QtGui/qopenglbuffer.h>
 #include <QtGui/qopenglframebufferobject.h>
 #include <QtGui/qopengltexture.h>
 #include <QtGui/qevent.h>
@@ -72,7 +74,8 @@ private:
         const QString& vShaderFile,
         const QString& fShaderFile,
         const QString& gShaderFile = "");
-    void drawVBO(QOpenGLShaderProgram* const program, const VBO& vbo);
+    void drawVAO(QOpenGLShaderProgram* const program, QOpenGLVertexArrayObject* const vao,
+                 QOpenGLBuffer* const vBuffer, QOpenGLBuffer* const iBuffer);
 
     void setTexture(QOpenGLTexture* texture, const QImage& image) const;
 
@@ -89,6 +92,13 @@ private:
 
     VBO objectVBO;
     VBO floorVBO;
+    std::unique_ptr<QOpenGLVertexArrayObject> objectVAO   = nullptr;
+    std::unique_ptr<QOpenGLBuffer> objectVB = nullptr;
+    std::unique_ptr<QOpenGLBuffer> objectIB = nullptr;
+    std::unique_ptr<QOpenGLVertexArrayObject> floorVAO    = nullptr;
+    std::unique_ptr<QOpenGLBuffer> floorVB = nullptr;
+    std::unique_ptr<QOpenGLBuffer> floorIB = nullptr;
+
     std::unique_ptr<QOpenGLFramebufferObject> depthFBO    = nullptr;
     std::unique_ptr<QOpenGLFramebufferObject> positionFBO = nullptr;
     std::unique_ptr<QOpenGLFramebufferObject> normalFBO   = nullptr;

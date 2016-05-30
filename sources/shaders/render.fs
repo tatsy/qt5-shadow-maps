@@ -110,9 +110,9 @@ vec3 reflectiveSM(vec3 V, vec3 N) {
     vec3 ret = vec3(0.0, 0.0, 0.0);
     for (int i = 0; i < nSamples; i++) {
         vec2 coord = shadowCoord.st / shadowCoord.w + delta[i];
-        vec3 Np  = texture2D(normalMap, coord.xy).xyz * 2.0 - 1.0;
-        vec3 Vp  = texture2D(positionMap, coord.xy).xyz;
-        vec3 Phi = texture2D(albedoMap, coord.xy).xyz;
+        vec3 Np  = texture(normalMap, coord.xy).xyz * 2.0 - 1.0;
+        vec3 Vp  = texture(positionMap, coord.xy).xyz;
+        vec3 Phi = texture(albedoMap, coord.xy).xyz;
         ret += Phi * max(0.0, dot(Np, V - Vp)) * max(0.0, dot(N, Vp - V)) / pow(length(V - Vp), 4.0);
     }
     return 4.0 * Pi * ret / nSamples;
@@ -126,7 +126,7 @@ float calcShadow(vec3 coord, float bias) {
     int nSample = 16;
     float shadow = 0.0;
     for (int i = 0; i < nSample; i++) {
-        vec2 texCoord = coord.xy * 0.5 + 0.5 + poissonDisk[i] * 0.004;
+        vec2 texCoord = coord.xy * 0.5 + 0.5 + poissonDisk[i] * 0.002;
         float distFromLight = texture2D(depthMap, texCoord).z + bias;
         shadow += distFromLight < coord.z ? 0.5 : 1.0;
     }
@@ -142,7 +142,7 @@ vec4 gamma(vec4 org) {
 }
 
 void main(void) {
-    initPoissonDisk();
+  initPoissonDisk();
 
   vec3 V = -normalize(vertexCameraspace);
   vec3 N =  normalize(normalCameraspace);
@@ -152,10 +152,10 @@ void main(void) {
   float NdotL  = dot(N, L);
   float distLV = length(lightWorldspace - vertexWorldspace);
 
-  vec4 diffuse = vec4(max(0.0, NdotL)) / distLV;
+  vec4 diffuse = vec4(max(0.0, NdotL));
 
   vec4 coord = shadowCoord / shadowCoord.w;
-  float bias = tan(acos(max(0.0, dot(N, L)))) * 0.005;
+  float bias = tan(acos(max(0.0, dot(N, L)))) * 0.001;
   float shadow = calcShadow(coord.xyz, bias);
 
   if (mode == MODE_SM) {
@@ -170,9 +170,9 @@ void main(void) {
   } else if (mode == MODE_ISM) {
       vec2 texCoord = vertexScreenspace.xy / vertexScreenspace.w;
       texCoord = texCoord * 0.5 + 0.5;
-      vec3 indirect = texture2D(indirectMap, texCoord).xyz;
+      vec3 indirect = texture(indirectMap, texCoord).xyz;
       color = vec4(vertexColor, 1.0) * diffuse * shadow;
-      color += indirect;
+      color += vec4(indirect, 1.0);
   }
 
   color = vec4(Le, 1.0) * color;

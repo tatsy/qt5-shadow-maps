@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <QtGui/qmatrix4x4.h>
+#include <QtGui/qopenglbuffer.h>
 
 #include "shadowmaps_widget.h"
 #include "common.h"
@@ -35,12 +36,16 @@ ShadowMapsWidget::ShadowMapsWidget(QWidget* parent)
     , QOpenGLFunctions()
     , objectVBO()
     , floorVBO() {
+    // Title setup
     setWindowTitle("Qt5 Shadow Maps (SM)");
 
-    arcball = std::make_unique<ArcballController>(this);
+    // Camera setup
     camera.eye  = QVector3D(0.0f, 0.0f, 15.0f);
     camera.look = QVector3D(0.0f, 0.0f, 0.0f);
     camera.up   = QVector3D(0.0f, 1.0f, 0.0f);
+
+    // Arcball controller setup
+    arcball = std::make_unique<ArcballController>(this);
 }
 
 ShadowMapsWidget::~ShadowMapsWidget() {
@@ -66,7 +71,59 @@ void ShadowMapsWidget::initializeGL() {
     // Load obj files
     const char* objfile = (std::string(DATA_DIRECTORY) + "budda.obj").c_str();
     objectVBO = VBO::fromObjFile(objfile, QVector3D(0.5f, 0.5f, 0.5f));
+    
+    objectVAO = std::make_unique<QOpenGLVertexArrayObject>(this);
+    objectVAO->create();
+    objectVAO->bind();
+
+    {
+        objectVB = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+        objectVB->create();
+        objectVB->setUsagePattern(QOpenGLBuffer::StaticDraw);
+        objectVB->bind();
+
+        const int vBufSize = objectVBO.vertices().size() * sizeof(float) * 3;
+        objectVB->allocate(objectVBO.vertices().size() * sizeof(float) * (3 + 3 + 3));
+        objectVB->write(0, &objectVBO.vertices()[0], vBufSize);
+        objectVB->write(vBufSize, &objectVBO.normals()[0], vBufSize);
+        objectVB->write(vBufSize * 2, &objectVBO.colors()[0], vBufSize);
+        objectVB->release();
+
+        objectIB = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::IndexBuffer);
+        objectIB->create();
+        objectIB->setUsagePattern(QOpenGLBuffer::StaticDraw);
+        objectIB->bind();
+        objectIB->allocate(&objectVBO.indices()[0], objectVBO.indices().size() * sizeof(unsigned int) * 3);
+        objectIB->release();
+    }
+    objectVAO->release();
+
     floorVBO  = VBO::colorBox(); 
+
+    floorVAO = std::make_unique<QOpenGLVertexArrayObject>(this);
+    floorVAO->create();
+    floorVAO->bind();
+    {
+        floorVB = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+        floorVB->create();
+        floorVB->setUsagePattern(QOpenGLBuffer::StaticDraw);
+        floorVB->bind();
+
+        const int vBufSize = floorVBO.vertices().size() * sizeof(float) * 3;
+        floorVB->allocate(floorVBO.vertices().size() * sizeof(float) * (3 + 3 + 3));
+        floorVB->write(0, &floorVBO.vertices()[0], vBufSize);
+        floorVB->write(vBufSize, &floorVBO.normals()[0], vBufSize);
+        floorVB->write(vBufSize * 2, &floorVBO.colors()[0], vBufSize);
+        floorVB->release();
+
+        floorIB = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::IndexBuffer);
+        floorIB->create();
+        floorIB->setUsagePattern(QOpenGLBuffer::StaticDraw);
+        floorIB->bind();
+        floorIB->allocate(&floorVBO.indices()[0], floorVBO.indices().size() * sizeof(unsigned int) * 3);
+        floorIB->release();
+    }
+    floorVAO->release();
 
     // Prepare shader programs
     renderShader    = compileShader(QString(SOURCE_DIRECTORY) + "shaders/render.vs",
@@ -83,7 +140,7 @@ void ShadowMapsWidget::initializeGL() {
     ismRenderShader = compileShader(QString(SOURCE_DIRECTORY) + "shaders/ismrender.vs",
                                     QString(SOURCE_DIRECTORY) + "shaders/ismrender.fs");
 
-    // Initialize FBO
+    // Initialize FBOs
     depthFBO = std::make_unique<QOpenGLFramebufferObject>(
         SHADOW_MAP_SIZE, SHADOW_MAP_SIZE,
         QOpenGLFramebufferObject::Attachment::Depth,
@@ -202,18 +259,20 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
         glBindTexture(GL_TEXTURE_2D, indirectFBO->texture());
     }
 
+    // Set textures to uniform variables
     renderShader->setUniformValue("depthMap",    0);
     renderShader->setUniformValue("normalMap",   1);
     renderShader->setUniformValue("positionMap", 2);
     renderShader->setUniformValue("albedoMap",   3);
     renderShader->setUniformValue("indirectMap", 4);
 
+    // Other uniform variables
     renderShader->setUniformValue("projectionMatrix", projectionMatrix);
     renderShader->setUniformValue("modelviewMatrix", modelviewMatrix);
     renderShader->setUniformValue("normalMatrix", normalMatrix);
     renderShader->setUniformValue("depthMVP", depthMVP);
 
-    renderShader->setUniformValue("Le", QVector3D(4.0f, 4.0f, 4.0f));
+    renderShader->setUniformValue("Le", QVector3D(1.0f, 1.0f, 1.0f));
     renderShader->setUniformValue("cameraPosition", camera.eye);
     renderShader->setUniformValue("lightPosition", LIGHT_POSITION);
 
@@ -226,9 +285,9 @@ void ShadowMapsWidget::drawScene(const QMatrix4x4& depthMVP) {
     renderShader->setUniformValue("mode", (int)shadowMode);
 
     renderShader->setUniformValue("receiveShadow", 0);
-    drawVBO(renderShader.get(), objectVBO);
+    drawVAO(renderShader.get(), objectVAO.get(), objectVB.get(), objectIB.get());
     renderShader->setUniformValue("receiveShadow", 1);
-    drawVBO(renderShader.get(), floorVBO);
+    drawVAO(renderShader.get(), floorVAO.get(), floorVB.get(), floorIB.get());
 
     renderShader->release();
 }
@@ -319,8 +378,8 @@ void ShadowMapsWidget::drawISM(const std::vector<VPL>& VPLs) {
         ismRenderShader->setUniformValueArray("mvVPL", &mvVPLs[0], ismCols);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        drawVBO(ismRenderShader.get(), objectVBO);
-        drawVBO(ismRenderShader.get(), floorVBO);
+        drawVAO(ismRenderShader.get(), objectVAO.get(), objectVB.get(), objectIB.get());
+        drawVAO(ismRenderShader.get(), floorVAO.get(), floorVB.get(), floorIB.get());
 
         if (currentRow == ismRows - 1) {
             indirectFBO->release();
@@ -364,7 +423,8 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     shadowmapShader->setUniformValue("mode", (int)DrawMode::Depth);
-    drawVBO(shadowmapShader.get(), objectVBO);
+
+    drawVAO(shadowmapShader.get(), objectVAO.get(), objectVB.get(), objectIB.get());
     depthFBO->release();
     //drawVBO(shadowmapShader, floorVBO);
 
@@ -376,7 +436,7 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shadowmapShader->setUniformValue("mode", (int)DrawMode::Normal);
     //drawVBO(shadowmapShader, objectVBO);
-    drawVBO(shadowmapShader.get(), floorVBO);
+    drawVAO(shadowmapShader.get(), floorVAO.get(), floorVB.get(), floorIB.get());
     normalFBO->release();
     
     QImage normalImage = normalFBO->toImage();
@@ -387,7 +447,7 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shadowmapShader->setUniformValue("mode", (int)DrawMode::Position);
     //drawVBO(shadowmapShader, objectVBO);
-    drawVBO(shadowmapShader.get(), floorVBO);
+    drawVAO(shadowmapShader.get(), floorVAO.get(), floorVB.get(), floorIB.get());
     positionFBO->release();
 
     QImage positionImage = positionFBO->toImage();
@@ -398,7 +458,7 @@ void ShadowMapsWidget::shadowMapping(QMatrix4x4* depthMVP) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shadowmapShader->setUniformValue("mode", (int)DrawMode::Albedo);
     //drawVBO(shadowmapShader, objectVBO);
-    drawVBO(shadowmapShader.get(), floorVBO);
+    drawVAO(shadowmapShader.get(), floorVAO.get(), floorVB.get(), floorIB.get());
     albedoFBO->release();
     
     QImage albedoImage = albedoFBO->toImage();
@@ -483,8 +543,8 @@ void ShadowMapsWidget::imperfectShadowMapping(
 
         depthShader->setUniformValue("mvpMat", mvpMat);
 
-        drawVBO(depthShader.get(), floorVBO);
-        drawVBO(depthShader.get(), objectVBO);
+        drawVAO(depthShader.get(), floorVAO.get(), floorVB.get(), floorIB.get());
+        drawVAO(depthShader.get(), objectVAO.get(), objectVB.get(), objectIB.get());
 
         depthImage = fbo.toImage();
         depthImage.save(QString(OUTPUT_DIRECTORY) + "depthISM.png");
@@ -503,8 +563,8 @@ void ShadowMapsWidget::imperfectShadowMapping(
         shadowmapShader->setUniformValue("mvpMat", mvpMat);
         shadowmapShader->setUniformValue("mode", (int)DrawMode::Normal);
 
-        drawVBO(shadowmapShader.get(), floorVBO);
-        drawVBO(shadowmapShader.get(), objectVBO);
+        drawVAO(shadowmapShader.get(), floorVAO.get(), floorVB.get(), floorIB.get());
+        drawVAO(shadowmapShader.get(), objectVAO.get(), objectVB.get(), objectIB.get());
 
         normalImage = fbo.toImage();
         normalImage.save(QString(OUTPUT_DIRECTORY) + "normalISM.png");
@@ -523,8 +583,8 @@ void ShadowMapsWidget::imperfectShadowMapping(
         shadowmapShader->setUniformValue("mvpMat", mvpMat);
         shadowmapShader->setUniformValue("mode", (int)DrawMode::Albedo);
 
-        drawVBO(shadowmapShader.get(), floorVBO);
-        drawVBO(shadowmapShader.get(), objectVBO);
+        drawVAO(shadowmapShader.get(), floorVAO.get(), floorVB.get(), floorIB.get());
+        drawVAO(shadowmapShader.get(), objectVAO.get(), objectVB.get(), floorIB.get());
 
         albedoImage = fbo.toImage();
         albedoImage.save(QString(OUTPUT_DIRECTORY) + "albedoISM.png");
@@ -596,8 +656,9 @@ void ShadowMapsWidget::imperfectShadowMapping(
         ismShader->setUniformValue("maxDepth", 20.0f);
         ismShader->setUniformValueArray("mvVPL", &mvVPLs[0] + i, ismCols);
 
-        ismShader->setAttributeArray("vertices", &vertices[0]);
+        //ismShader->setAttributeBuffer("vertices", GL_FLOAT, 0, 3, 0);
         ismShader->enableAttributeArray("vertices");
+        ismShader->setAttributeArray("vertices", &vertices[0]);
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
@@ -621,25 +682,35 @@ void ShadowMapsWidget::imperfectShadowMapping(
     glViewport(0, 0, width(), height());
 }
 
-void ShadowMapsWidget::drawVBO(QOpenGLShaderProgram* const shader, const VBO& vbo) {
+void ShadowMapsWidget::drawVAO(QOpenGLShaderProgram* const shader, QOpenGLVertexArrayObject* const vao,
+                               QOpenGLBuffer* const vBuffer, QOpenGLBuffer* const iBuffer) {
+    vao->bind();
+    vBuffer->bind();
+    iBuffer->bind();
+
     shader->enableAttributeArray("vertices");
     shader->enableAttributeArray("normals");
     shader->enableAttributeArray("colors");
 
-    shader->setAttributeArray("vertices", &vbo.vertices()[0]);
-    shader->setAttributeArray("normals", &vbo.normals()[0]);
-    shader->setAttributeArray("colors", &vbo.colors()[0]);
+    int offset = vBuffer->size() / 3;
+    shader->setAttributeBuffer("vertices", GL_FLOAT, 0, 3, 0);
+    shader->setAttributeBuffer("normals",  GL_FLOAT, offset, 3, 0);
+    shader->setAttributeBuffer("colors",   GL_FLOAT, offset * 2, 3, 0);
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
-    glDrawElements(GL_TRIANGLES, vbo.indices().size() * 3, GL_UNSIGNED_INT, (unsigned int*)&vbo.indices()[0]);
+    glDrawElements(GL_TRIANGLES, iBuffer->size(), GL_UNSIGNED_INT, 0);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
     shader->disableAttributeArray("vertices");
     shader->disableAttributeArray("normals");
     shader->disableAttributeArray("colors");
+
+    vao->release();
+    vBuffer->release();
+    iBuffer->release();
 }
 
 void ShadowMapsWidget::setTexture(QOpenGLTexture* texture, const QImage& image) const {

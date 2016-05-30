@@ -58,7 +58,7 @@ vec3 calcIndirect(vec3 V, vec3 N) {
         vec2 texCoord = posSph.xy * 0.5 + 0.5;
         texCoord.x = (texCoord.x + j) / ismCols;
         texCoord.y = (texCoord.y + currentRow) / ismRows;
-        float distFromVPL = texture2D(ismTexture, texCoord).z;
+        float distFromVPL = texture(ismTexture, texCoord).z;
 
         if (distFromVPL + bias >= posSph.z && posCam.w > 0.0) {
             indirect += reflectiveSM(V, N, posVPL[j], nrmVPL[j], albVPL[j]);
