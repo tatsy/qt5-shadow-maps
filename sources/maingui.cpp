@@ -7,16 +7,16 @@
 #include <QtWidgets/qfiledialog.h>
 
 #include "common.h"
-#include "shadowmaps_widget.h"
+#include "openglviewer.h"
 
 // --
 // MainGUI::InterfaceWidget class definition
 // --
 
-class MainGUI::InterfaceWidget : public QWidget {
+class MainGUI::Ui : public QWidget {
 public:
     // Public methods
-    explicit InterfaceWidget(QWidget* parent = nullptr)
+    explicit Ui(QWidget* parent = nullptr)
         : QWidget{ parent}
         , layout{ new QVBoxLayout }
         , saveButton{ new QPushButton }
@@ -44,7 +44,7 @@ public:
         layout->addWidget(saveButton);
     }
 
-    ~InterfaceWidget() {
+    virtual ~Ui() {
         delete groupLayout;
         delete smTypeGroup;
         delete saveButton;
@@ -71,30 +71,30 @@ MainGUI::MainGUI(QWidget* parent)
     : QMainWindow{ parent }
     , mainWidget{ new QWidget }
     , mainLayout{ new QGridLayout }
-    , displayWidget{ nullptr }
-    , ifaceWidget{ nullptr } {
+    , viewer{ nullptr }
+    , ui{ nullptr } {
     mainWidget->setLayout(mainLayout);
     setCentralWidget(mainWidget);
     
     mainLayout->setColumnStretch(0, 4);
     mainLayout->setColumnStretch(1, 1);
 
-    displayWidget = new ShadowMapsWidget(this);
-    ifaceWidget = new InterfaceWidget(this);
+    viewer = new OpenGLViewer(mainWidget);
+    ui = new Ui(mainWidget);
 
-    mainLayout->addWidget(displayWidget, 0, 0);
-    mainLayout->addWidget(ifaceWidget, 0, 1);
+    mainLayout->addWidget(viewer, 0, 0);
+    mainLayout->addWidget(ui, 0, 1);
 
     // Connect SIGNAL/SLOT
-    connect(ifaceWidget->saveButton, SIGNAL(clicked()), this, SLOT(OnSaveButtonClicked()));
-    connect(ifaceWidget->smRadioButton, SIGNAL(toggled(bool)), this, SLOT(OnRadioButtonChanged(bool)));
-    connect(ifaceWidget->rsmRadioButton, SIGNAL(toggled(bool)), this, SLOT(OnRadioButtonChanged(bool)));
-    connect(ifaceWidget->ismRadioButton, SIGNAL(toggled(bool)), this, SLOT(OnRadioButtonChanged(bool)));
+    connect(ui->saveButton, SIGNAL(clicked()), this, SLOT(OnSaveButtonClicked()));
+    connect(ui->smRadioButton, SIGNAL(toggled(bool)), this, SLOT(OnRadioButtonChanged(bool)));
+    connect(ui->rsmRadioButton, SIGNAL(toggled(bool)), this, SLOT(OnRadioButtonChanged(bool)));
+    connect(ui->ismRadioButton, SIGNAL(toggled(bool)), this, SLOT(OnRadioButtonChanged(bool)));
 }
 
 MainGUI::~MainGUI() {
-    delete displayWidget;
-    delete ifaceWidget;
+    delete viewer;
+    delete ui;
     delete mainLayout;
     delete mainWidget;
 }
@@ -106,17 +106,16 @@ void MainGUI::OnSaveButtonClicked() {
                                      tr("JPEG (*.jpg);PNG (*.png)"));
     if (savefile == "") return;
 
-    QImage image = displayWidget->grabFramebuffer();
+    QImage image = viewer->grabFramebuffer();
     image.save(savefile);
 }
 
 void MainGUI::OnRadioButtonChanged(bool) {
-    if (ifaceWidget->smRadioButton->isChecked()) {
-        ((ShadowMapsWidget*)displayWidget)->setShadowMode(ShadowMaps::SM);
-    } else if (ifaceWidget->rsmRadioButton->isChecked()) {
-        ((ShadowMapsWidget*)displayWidget)->setShadowMode(ShadowMaps::RSM);
-    } else if (ifaceWidget->ismRadioButton->isChecked()) {
-        ((ShadowMapsWidget*)displayWidget)->setShadowMode(ShadowMaps::ISM);
+    if (ui->smRadioButton->isChecked()) {
+        viewer->setShadowMode(ShadowMapType::SM);
+    } else if (ui->rsmRadioButton->isChecked()) {
+        viewer->setShadowMode(ShadowMapType::RSM);
+    } else if (ui->ismRadioButton->isChecked()) {
+        viewer->setShadowMode(ShadowMapType::ISM);
     }
-    displayWidget->update();
 }

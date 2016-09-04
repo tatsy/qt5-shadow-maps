@@ -1,43 +1,33 @@
 #version 330
 
-in vec3 vertices;
-in vec3 normals;
-in vec3 colors;
+layout(location = 0) in vec3 in_position;
+layout(location = 1) in vec3 in_normal;
+layout(location = 2) in vec4 in_color;
 
-uniform mat4 projectionMatrix;
-uniform mat4 modelviewMatrix;
-uniform mat4 normalMatrix;
-uniform mat4 depthMVP;
+out vec3 f_posView;
+out vec3 f_nrmView;
+out vec3 f_lightPos;
+out vec3 f_color;
 
-uniform vec3 lightPosition;
+out vec3 f_posWorld;
+out vec3 f_nrmWorld;
+out vec4 f_posLightSpace;
 
-out vec3 vertexWorldspace;
-out vec3 normalWorldspace;
-out vec3 lightWorldspace;
+uniform mat4 u_mvMat;
+uniform mat4 u_mvpMat;
+uniform vec3 u_lightPos;
 
-out vec3 vertexCameraspace;
-out vec3 normalCameraspace;
-out vec3 lightCameraspace;
-out vec3 vertexColor;
-
-out vec4 vertexScreenspace;
-
-out vec4 shadowCoord;
+uniform mat4 u_lightMvpMat;
 
 void main(void) {
-  gl_Position = projectionMatrix * modelviewMatrix * vec4(vertices, 1.0);
+    gl_Position = u_mvpMat * vec4(in_position, 1.0);
 
-  vertexWorldspace = vertices;
-  normalWorldspace = normals;
-  lightWorldspace = lightPosition;
+    f_posView = (u_mvMat * vec4(in_position, 1.0)).xyz;
+    f_nrmView = (transpose(inverse(u_mvMat)) * vec4(in_normal, 1.0)).xyz;
+    f_lightPos = (u_mvMat * vec4(u_lightPos, 1.0)).xyz;
+    f_color   = in_color.rgb;
 
-  vertexCameraspace = (modelviewMatrix * vec4(vertices, 1.0)).xyz;
-  normalCameraspace = (normalMatrix * vec4(normals, 1.0)).xyz;
-  lightCameraspace = (modelviewMatrix * vec4(lightPosition, 0.0)).xyz;
-
-  vertexColor = colors;
-
-  vertexScreenspace = gl_Position;
-
-  shadowCoord = depthMVP * vec4(vertices, 1.0);
+    f_posWorld = in_position;
+    f_nrmWorld = in_normal;
+    f_posLightSpace = u_lightMvpMat * vec4(in_position, 1.0);
 }

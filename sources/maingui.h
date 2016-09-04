@@ -9,6 +9,8 @@
 #include <QtWidgets/qgridlayout.h>
 #include <QtWidgets/qopenglwidget.h>
 
+#include "openglviewer.h"
+
 class MainGUI : public QMainWindow {
     Q_OBJECT
 public:
@@ -23,12 +25,13 @@ private slots:
 
 private:
     // Private fields
-    QWidget* mainWidget;
-    QGridLayout* mainLayout;
-    QOpenGLWidget* displayWidget;
+    QWidget *mainWidget;
+    QGridLayout *mainLayout;
 
-    class InterfaceWidget;
-    InterfaceWidget* ifaceWidget;
+    OpenGLViewer *viewer;
+
+    class Ui;
+    Ui *ui;
 };
 
 #endif  // _MAINGUI_H_
