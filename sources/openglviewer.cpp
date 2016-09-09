@@ -5,10 +5,19 @@
 #include "common.h"
 #include "glutils.h"
 
-static const int SHADOWMAP_SIZE = 2048;
+static const int SHADOWMAP_SIZE = 512;
 static const int nSamples = 64;
 static const float sampleRadius = 0.5f;
 static const QVector3D lightPos = QVector3D(0.0f, 9.0f, 0.0f);
+
+QVector3D axes[6] = {
+    QVector3D(-1.0f,  0.0f,  0.0f),
+    QVector3D( 1.0f,  0.0f,  0.0f),
+    QVector3D( 0.0f, -1.0f,  0.0f),
+    QVector3D( 0.0f,  1.0f,  0.0f),
+    QVector3D( 0.0f,  0.0f, -1.0f),
+    QVector3D( 0.0f,  0.0f,  1.0f)
+};
 
 OpenGLViewer::OpenGLViewer(QWidget *parent)
     : QOpenGLWidget(parent)
@@ -33,7 +42,7 @@ void OpenGLViewer::initializeGL() {
     vao->load(std::string(DATA_DIRECTORY) + "cbox.ply");
     
     shader = compileShader(std::string(SOURCE_DIRECTORY) + "shaders/render");
-    rsmShader = compileShader(std::string(SOURCE_DIRECTORY) + "shaders/rsm");
+    rsmShader = compileShader(std::string(SOURCE_DIRECTORY) + "shaders/rsm", true);
     
     camera->setLookAt(QVector3D(0.0f, 5.0f, 15.0f), QVector3D(0.0f, 5.0f, 0.0f), QVector3D(0.0f, 1.0f, 0.0f));
 
@@ -50,6 +59,16 @@ void OpenGLViewer::initializeGL() {
     }
 
     randTexture->setData(0, 0, QOpenGLTexture::Red, QOpenGLTexture::Float32, &randValues[0], 0);
+    
+    cubeViewMat.resize(6);
+    for (int i = 0; i < 6; i++) {
+        QVector3D center = lightPos + axes[i];
+        QVector3D up(0.0f, 1.0f, 0.0f);
+        if (QVector3D::crossProduct(axes[i], up).length() < 0.01f) {
+            up = QVector3D(1.0f, 0.0f, 0.0f);
+        }
+        cubeViewMat[i].lookAt(lightPos, center, up);
+    }
 }
 
 void OpenGLViewer::paintGL() {
@@ -57,14 +76,13 @@ void OpenGLViewer::paintGL() {
     int viewport[4];
     glGetIntegerv(GL_VIEWPORT, viewport);
 
-    glViewport(0, 0, SHADOWMAP_SIZE, SHADOWMAP_SIZE);
+    glViewport(0, 0, SHADOWMAP_SIZE * 4, SHADOWMAP_SIZE * 3);
 
     rsmShader->bind();
     rsmFbo->bind();
     
     QMatrix4x4 pMat, mvMat;
-    pMat.perspective(60.0f, 1.0f, 0.1f, 100.0f);
-    mvMat.lookAt(lightPos, QVector3D(0.0f, 0.0f, 0.0f), QVector3D(0.0f, 0.0f, 1.0f));
+    pMat.ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.01f, 10.0f);
     QMatrix4x4 mvpMat = pMat * mvMat;
     
     auto f = QOpenGLContext::currentContext()->extraFunctions();
@@ -72,7 +90,8 @@ void OpenGLViewer::paintGL() {
                       GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
     f->glDrawBuffers(4, bufs);
 
-    rsmShader->setUniformValue("u_mvpMat", mvpMat);
+    rsmShader->setUniformValue("u_projMat", pMat);
+    rsmShader->setUniformValueArray("u_mvMat", &cubeViewMat[0], 6);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
@@ -83,6 +102,11 @@ void OpenGLViewer::paintGL() {
     
     rsmShader->release();
     rsmFbo->release();
+    
+    rsmFbo->toImage(true, 0).save(QString(OUTPUT_DIRECTORY) + "depth.png");
+    rsmFbo->toImage(true, 1).save(QString(OUTPUT_DIRECTORY) + "position.png");
+    rsmFbo->toImage(true, 2).save(QString(OUTPUT_DIRECTORY) + "normal.png");
+    rsmFbo->toImage(true, 3).save(QString(OUTPUT_DIRECTORY) + "diffuse.png");
     
     // Rendering
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
@@ -124,13 +148,13 @@ void OpenGLViewer::resizeGL(int w, int h) {
     camera->setPerspective(45.0f, (float)width() / (float)height(), 0.1f, 100.0f);
     
     rsmFbo = std::make_unique<QOpenGLFramebufferObject>(
-        SHADOWMAP_SIZE, SHADOWMAP_SIZE,
+        SHADOWMAP_SIZE * 4, SHADOWMAP_SIZE * 3,
         QOpenGLFramebufferObject::Attachment::Depth,
         GL_TEXTURE_2D, GL_RGBA32F
     );
-    rsmFbo->addColorAttachment(SHADOWMAP_SIZE, SHADOWMAP_SIZE);
-    rsmFbo->addColorAttachment(SHADOWMAP_SIZE, SHADOWMAP_SIZE);
-    rsmFbo->addColorAttachment(SHADOWMAP_SIZE, SHADOWMAP_SIZE);
+    rsmFbo->addColorAttachment(SHADOWMAP_SIZE * 4, SHADOWMAP_SIZE * 3);
+    rsmFbo->addColorAttachment(SHADOWMAP_SIZE * 4, SHADOWMAP_SIZE * 3);
+    rsmFbo->addColorAttachment(SHADOWMAP_SIZE * 4, SHADOWMAP_SIZE * 3);
 }
 
 void OpenGLViewer::mousePressEvent(QMouseEvent *ev) {

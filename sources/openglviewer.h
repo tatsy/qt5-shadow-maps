@@ -54,6 +54,7 @@ private:
     
     std::unique_ptr<QOpenGLTexture> randTexture = nullptr;
     
+    std::vector<QMatrix4x4> cubeViewMat;
     ShadowMapType smType;
 };
 

@@ -15,6 +15,6 @@ void main(void) {
     out_depth = vec4(depth, depth, depth, 1.0);
 
     out_position = vec4(f_posWorld, 1.0);
-    out_normal = vec4(normalize(f_nrmWorld), 1.0);
+    out_normal = vec4(normalize(f_nrmWorld) * 0.5 + 0.5, 1.0);
     out_color = vec4(f_color.rgb, 1.0);
 }
